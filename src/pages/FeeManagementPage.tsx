@@ -21,6 +21,7 @@ import { FeePayment, Student, MadrasaClass } from '../types';
 import { fetchClasses } from '../utils/classManager';
 import { formatBDT, formatNumber, getTodayDateString } from '../utils/formatters';
 import { logAudit } from '../utils/auditLogger';
+import { AuthoritySignatureBlock } from '../components/AuthoritySignatureBlock';
 
 export const FeeManagementPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -651,13 +652,14 @@ export const FeeManagementPage: React.FC = () => {
                 </tbody>
               </table>
 
-              <div className="pt-8 flex justify-between text-slate-500 text-[10px]">
+              <div className="pt-8 flex items-end justify-between text-slate-500 text-[10px]">
                 <div className="border-t border-slate-400 w-28 text-center pt-1">
                   {isBn ? 'অভিভাবকের স্বাক্ষর' : 'Payer Signature'}
                 </div>
-                <div className="border-t border-slate-400 w-28 text-center pt-1">
-                  {isBn ? 'আদায়কারীর স্বাক্ষর' : 'Cashier Signature'}
-                </div>
+                <AuthoritySignatureBlock
+                  customTitle={isBn ? 'আদায়কারী / হিসাবরক্ষক' : 'Authorized Signature'}
+                  className="scale-90 origin-bottom-right"
+                />
               </div>
             </div>
           </div>

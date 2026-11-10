@@ -2,6 +2,7 @@ import React from 'react';
 import { Printer, X, CheckCircle2, ShieldCheck, AlertCircle, FileText } from 'lucide-react';
 import { SalaryPayment } from '../types';
 import { formatBDT, formatSalaryMonth, formatDate } from '../utils/formatters';
+import { AuthoritySignatureBlock } from './AuthoritySignatureBlock';
 
 interface SalaryReceiptModalProps {
   payment: SalaryPayment;
@@ -11,15 +12,21 @@ interface SalaryReceiptModalProps {
     institutionNameEn: string;
     address: string;
     phone: string;
+    authorizedSignatoryName?: string;
+    authorizedSignatoryTitle?: string;
+    authorizedSignatorySignatureUrl?: string;
+    authorizedSignatorySealUrl?: string;
   };
   language: 'bn' | 'en';
+  onEditSignatory?: () => void;
 }
 
 export const SalaryReceiptModal: React.FC<SalaryReceiptModalProps> = ({
   payment,
   onClose,
   settings,
-  language
+  language,
+  onEditSignatory
 }) => {
   const isBn = language === 'bn';
   const isAcknowledged = payment.acknowledgmentStatus === 'acknowledged';
@@ -263,19 +270,7 @@ export const SalaryReceiptModal: React.FC<SalaryReceiptModalProps> = ({
             </div>
 
             {/* Authority Signature Box */}
-            <div className="flex flex-col items-center justify-end text-center">
-              <div className="h-12 flex items-center justify-center">
-                <span className="font-serif italic text-blue-900 text-xs font-bold border-b border-dotted border-blue-900 pb-0.5">
-                  Jamia Madinatoon Noor
-                </span>
-              </div>
-              <div className="border-t border-slate-500 w-36 pt-1 text-[11px] font-bold text-slate-800">
-                {isBn ? 'মুহতামিম / প্রধান হিসাবরক্ষক' : 'Authorized Signatory'}
-              </div>
-              <p className="text-[9px] text-slate-500">
-                {settings.institutionName}
-              </p>
-            </div>
+            <AuthoritySignatureBlock onEdit={onEditSignatory} />
 
           </div>
 

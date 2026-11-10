@@ -20,6 +20,7 @@ import * as XLSX from 'xlsx';
 import { CashTransaction } from '../types';
 import { formatBDT, formatNumber, getTodayDateString } from '../utils/formatters';
 import { logAudit } from '../utils/auditLogger';
+import { AuthoritySignatureBlock } from '../components/AuthoritySignatureBlock';
 
 export const AccountsCashbookPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -542,13 +543,14 @@ export const AccountsCashbookPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-8 flex justify-between text-slate-500 text-[10px]">
+              <div className="pt-8 flex items-end justify-between text-slate-500 text-[10px]">
                 <div className="border-t border-slate-400 w-28 text-center pt-1">
                   {isBn ? 'আদায়কারী / প্রস্তুতকারী' : 'Prepared By'}
                 </div>
-                <div className="border-t border-slate-400 w-28 text-center pt-1">
-                  {isBn ? 'অনুমোদনকারী স্বাক্ষর' : 'Authorized Signature'}
-                </div>
+                <AuthoritySignatureBlock
+                  customTitle={isBn ? 'অনুমোদনকারী (মুহতামিম / হিসাবরক্ষক)' : 'Authorized Signatory'}
+                  className="scale-90 origin-bottom-right"
+                />
               </div>
             </div>
           </div>

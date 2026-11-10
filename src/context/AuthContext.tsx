@@ -12,7 +12,7 @@ import {
   setPersistence,
   browserLocalPersistence
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import { 
   UserProfile, 
@@ -248,10 +248,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let userDocUnsub: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (userDocUnsub) {
+        userDocUnsub();
+        userDocUnsub = null;
+      }
+
       if (user) {
         await fetchAndSyncProfile(user);
+
+        // Real-time listener on user's profile document so role, status, teacherId, and permissions update dynamically
+        const userDocRef = doc(db, 'users', user.uid);
+        userDocUnsub = onSnapshot(userDocRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as UserProfile;
+            const isDefaultAdmin = isAdminUser(user);
+            setUserProfile(prev => prev ? { ...prev, ...data } : data);
+            if (data.role && !isDefaultAdmin) {
+              setRole(data.role);
+            }
+            if (data.status && !isDefaultAdmin) {
+              setStatus(data.status);
+            }
+          }
+        }, (err) => {
+          console.warn("User doc onSnapshot warning:", err);
+        });
       } else {
         setUserProfile(null);
         setRole(null);
@@ -260,7 +285,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (userDocUnsub) userDocUnsub();
+      unsubscribe();
+    };
   }, []);
 
   const refreshUserProfile = async () => {

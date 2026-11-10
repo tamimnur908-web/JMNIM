@@ -11,11 +11,16 @@ import {
   Calendar, 
   Search, 
   Pin,
-  CheckCircle
+  CheckCircle,
+  Printer,
+  PenTool,
+  X
 } from 'lucide-react';
 import { Notice } from '../types';
 import { getTodayDateString, formatDate } from '../utils/formatters';
 import { logAudit } from '../utils/auditLogger';
+import { AuthoritySignatureBlock } from '../components/AuthoritySignatureBlock';
+import { AuthoritySignatureModal } from '../components/AuthoritySignatureModal';
 
 export const NoticeBoardPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -29,6 +34,8 @@ export const NoticeBoardPage: React.FC = () => {
 
   // Add Notice Modal
   const [showAddModal, setShowAddModal] = useState(false);
+  const [viewNotice, setViewNotice] = useState<Notice | null>(null);
+  const [showAuthoritySignatureModal, setShowAuthoritySignatureModal] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [targetRole, setTargetRole] = useState<'all' | 'teachers' | 'students' | 'accountant'>('all');
@@ -140,13 +147,24 @@ export const NoticeBoardPage: React.FC = () => {
         </div>
 
         {(isSuperAdmin || role === 'principal' || role === 'admin') && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition w-fit"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>{isBn ? 'নতুন নোটিশ জারি' : 'Publish Notice'}</span>
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowAuthoritySignatureModal(true)}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+              title={isBn ? 'মুহতামিম ও কর্তৃপক্ষের অফিসিয়াল স্বাক্ষর সেটিংস' : 'Authority Signature Settings'}
+            >
+              <PenTool className="w-3.5 h-3.5 text-amber-300" />
+              <span>{isBn ? 'কর্তৃপক্ষের স্বাক্ষর' : 'Signature'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center space-x-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>{isBn ? 'নতুন নোটিশ জারি' : 'Publish Notice'}</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -233,8 +251,22 @@ export const NoticeBoardPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="border-t border-slate-100 pt-2 flex items-center justify-between text-[11px] text-slate-400">
-                <span>জারিকারী: <b>{n.createdBy}</b></span>
+              <div className="border-t border-slate-100 pt-3 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3">
+                <div className="text-[11px] text-slate-400 space-y-1">
+                  <div>জারিকারী: <b>{n.createdBy}</b></div>
+                  <button
+                    type="button"
+                    onClick={() => setViewNotice(n)}
+                    className="text-blue-600 hover:underline font-semibold flex items-center space-x-1 text-xs"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>{isBn ? 'অফিসিয়াল কপি ও প্রিন্ট' : 'Official Notice Print'}</span>
+                  </button>
+                </div>
+
+                <AuthoritySignatureBlock
+                  onEdit={(isSuperAdmin || role === 'principal' || role === 'admin') ? () => setShowAuthoritySignatureModal(true) : undefined}
+                />
               </div>
             </div>
           ))}
@@ -321,6 +353,73 @@ export const NoticeBoardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Official Notice Print & Letterhead Modal */}
+      {viewNotice && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3 no-print">
+              <span className="text-xs font-bold text-slate-500 uppercase">{isBn ? 'দাপ্তরিক নোটিশ কপি' : 'Official Notice'}</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1 shadow-xs transition"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>{isBn ? 'প্রিন্ট' : 'Print'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewNotice(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Letterhead */}
+            <div className="border border-slate-200 p-6 rounded-xl space-y-6 bg-white">
+              <div className="text-center border-b pb-4 space-y-1">
+                <h2 className="text-lg font-black text-slate-900">জামিয়া মাদীনাতুন নূর ইসলামিয়া মাদরাসা</h2>
+                <p className="text-xs font-serif text-slate-600">Jamia Madinatun Nur Islamia Madrasha</p>
+                <div className="text-[10px] text-slate-400 font-mono">তারিখ: {viewNotice.publishDate}</div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="text-center">
+                  <span className="inline-block px-4 py-1 bg-slate-100 text-slate-800 rounded-full font-bold text-xs border border-slate-200">
+                    {isBn ? 'জরুরি দাপ্তরিক বিজ্ঞপ্তি' : 'Official Announcement'}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-slate-900 text-center">{viewNotice.title}</h3>
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line text-justify pt-2">
+                  {viewNotice.content}
+                </p>
+              </div>
+
+              {/* Bottom Signatures */}
+              <div className="pt-8 flex items-end justify-between border-t border-slate-100">
+                <div className="text-left text-[10px] text-slate-400">
+                  <p>জারিকারী: {viewNotice.createdBy}</p>
+                  <p>প্রাপক: {viewNotice.targetRole === 'all' ? 'সকলের জন্য' : viewNotice.targetRole}</p>
+                </div>
+
+                <AuthoritySignatureBlock
+                  onEdit={(isSuperAdmin || role === 'principal' || role === 'admin') ? () => setShowAuthoritySignatureModal(true) : undefined}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Authority Signature Settings Modal */}
+      <AuthoritySignatureModal
+        isOpen={showAuthoritySignatureModal}
+        onClose={() => setShowAuthoritySignatureModal(false)}
+      />
     </div>
   );
 };

@@ -5,11 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { 
   collection, 
   getDocs, 
+  getDoc,
   addDoc, 
   doc, 
   updateDoc, 
   query, 
-  where 
+  where,
+  onSnapshot 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
@@ -29,7 +31,8 @@ import {
   FileCheck2,
   Send,
   Eye,
-  Info
+  Info,
+  PenTool
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Teacher, SalaryPayment } from '../types';
@@ -37,6 +40,7 @@ import { formatBDT, formatNumber, getTodayDateString, formatSalaryMonth, formatD
 import { logAudit } from '../utils/auditLogger';
 import { SalaryReceiptModal } from '../components/SalaryReceiptModal';
 import { TeacherAcknowledgmentModal } from '../components/TeacherAcknowledgmentModal';
+import { AuthoritySignatureModal } from '../components/AuthoritySignatureModal';
 
 export const TeacherSalaryPage: React.FC = () => {
   const { t, language } = useLanguage();
@@ -85,10 +89,16 @@ export const TeacherSalaryPage: React.FC = () => {
   // Modals
   const [selectedPayslip, setSelectedPayslip] = useState<SalaryPayment | null>(null);
   const [acknowledgingPayment, setAcknowledgingPayment] = useState<SalaryPayment | null>(null);
+  const [showAuthoritySignatureModal, setShowAuthoritySignatureModal] = useState<boolean>(false);
 
   // Reminder feedback state
   const [reminderSendingId, setReminderSendingId] = useState<string | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  // Quick Salary Configuration State (Requirement 3.D)
+  const [setupSalaryTeacher, setSetupSalaryTeacher] = useState<Teacher | null>(null);
+  const [configuredBaseSalary, setConfiguredBaseSalary] = useState<number>(12000);
+  const [savingSalarySetup, setSavingSalarySetup] = useState(false);
 
   // Find linked teacher for the currently logged-in user
   const myLinkedTeacher = teachers.find(t => 
@@ -99,12 +109,48 @@ export const TeacherSalaryPage: React.FC = () => {
     (userProfile?.phoneNumber && t.phone && t.phone.replace(/\D/g, '') === userProfile.phoneNumber.replace(/\D/g, ''))
   );
 
+  // Auto-heal teacher profile on user doc if mismatched or missing
+  useEffect(() => {
+    if (currentUser?.uid && myLinkedTeacher) {
+      if (!userProfile?.teacherId || !userProfile?.teacherDocId) {
+        updateDoc(doc(db, 'users', currentUser.uid), {
+          teacherId: myLinkedTeacher.teacherId,
+          teacherDocId: myLinkedTeacher.id,
+          updatedAt: new Date().toISOString()
+        }).catch(err => console.warn("Auto-sync teacherId on user profile:", err));
+      }
+    }
+  }, [currentUser?.uid, myLinkedTeacher?.id, myLinkedTeacher?.teacherId, userProfile?.teacherId]);
+
   // Auto-redirect teacher-only role to personal view
   useEffect(() => {
     if (isTeacherOnly) {
       setActiveTab('my_salary');
     }
   }, [isTeacherOnly]);
+
+  const openDeepLinkedPayment = async (paymentId: string) => {
+    try {
+      const pDoc = await getDoc(doc(db, 'salary_payments', paymentId));
+      if (pDoc.exists()) {
+        const paymentData = { id: pDoc.id, ...pDoc.data() } as SalaryPayment;
+        setTeacherPayments(prev => {
+          if (!prev.some(x => x.id === paymentData.id)) {
+            return [paymentData, ...prev];
+          }
+          return prev;
+        });
+
+        if (paymentData.acknowledgmentStatus === 'pending') {
+          setAcknowledgingPayment(paymentData);
+        } else {
+          setSelectedPayslip(paymentData);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not load deep-linked payment:", err);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -116,10 +162,10 @@ export const TeacherSalaryPage: React.FC = () => {
       setTeachers(tList);
 
       // 2. Load Users (to resolve teacher UIDs if missing on teacher document)
-      let uList: any[] = [];
       if (isAccountantOrAdmin) {
         try {
           const uSnap = await getDocs(collection(db, 'users'));
+          const uList: any[] = [];
           uSnap.forEach(d => uList.push({ id: d.id, ...d.data() }));
           setAllUsers(uList);
         } catch (e) {
@@ -127,46 +173,11 @@ export const TeacherSalaryPage: React.FC = () => {
         }
       }
 
-      // 3. Payments for Admin View (All payments for selected month)
-      if (isAccountantOrAdmin) {
-        const pSnap = await getDocs(query(collection(db, 'salary_payments'), where('month', '==', selectedMonth)));
-        const pList: SalaryPayment[] = [];
-        pSnap.forEach(d => pList.push({ id: d.id, ...d.data() } as SalaryPayment));
-        setPayments(pList);
-      }
-
-      // 4. Payments for Teacher's Personal View
-      // Determine effective teacher ID for logged in user
-      const effectiveTeacher = tList.find(t => 
-        (t.userId && currentUser?.uid && t.userId === currentUser.uid) ||
-        (userProfile?.teacherDocId && t.id === userProfile.teacherDocId) ||
-        (userProfile?.teacherId && t.teacherId === userProfile.teacherId) ||
-        (currentUser?.email && t.email && t.email.toLowerCase() === currentUser.email.toLowerCase()) ||
-        (userProfile?.phoneNumber && t.phone && t.phone.replace(/\D/g, '') === userProfile.phoneNumber.replace(/\D/g, ''))
-      );
-
-      if (effectiveTeacher) {
-        const mySnap = await getDocs(
-          query(collection(db, 'salary_payments'), where('teacherId', '==', effectiveTeacher.teacherId))
-        );
-        const myList: SalaryPayment[] = [];
-        mySnap.forEach(d => myList.push({ id: d.id, ...d.data() } as SalaryPayment));
-        myList.sort((a, b) => (b.month > a.month ? 1 : -1));
-        setTeacherPayments(myList);
-
-        // Check if there's a deep-linked salary payment ID from a notification
-        const openPaymentId = sessionStorage.getItem('open_salary_payment_id');
-        if (openPaymentId) {
-          sessionStorage.removeItem('open_salary_payment_id');
-          const matched = myList.find(p => p.id === openPaymentId);
-          if (matched) {
-            if (matched.acknowledgmentStatus === 'pending') {
-              setAcknowledgingPayment(matched);
-            } else {
-              setSelectedPayslip(matched);
-            }
-          }
-        }
+      // Check for deep-linked salary payment ID
+      const openPaymentId = sessionStorage.getItem('open_salary_payment_id');
+      if (openPaymentId) {
+        sessionStorage.removeItem('open_salary_payment_id');
+        await openDeepLinkedPayment(openPaymentId);
       }
     } catch (err) {
       console.warn("Could not load salary data:", err);
@@ -177,7 +188,121 @@ export const TeacherSalaryPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [selectedMonth, currentUser?.uid]);
+
+    // 1. Real-time listener for teachers
+    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (snap) => {
+      const tList: Teacher[] = [];
+      snap.forEach(d => tList.push({ id: d.id, ...d.data() } as Teacher));
+      tList.sort((a, b) => (a.teacherId || '').localeCompare(b.teacherId || ''));
+      setTeachers(tList);
+    }, (err) => {
+      console.warn("Real-time teachers listener error:", err);
+    });
+
+    // 2. Listen for custom event dispatched from notification click
+    const handleCustomOpen = (e: any) => {
+      const pId = e.detail?.paymentId;
+      if (pId) {
+        openDeepLinkedPayment(pId);
+      }
+    };
+    window.addEventListener('open_salary_payment', handleCustomOpen);
+
+    return () => {
+      unsubTeachers();
+      window.removeEventListener('open_salary_payment', handleCustomOpen);
+    };
+  }, []);
+
+  // Real-time listener for Admin View Payments (Selected Month)
+  useEffect(() => {
+    if (!isAccountantOrAdmin) return;
+
+    const q = query(collection(db, 'salary_payments'), where('month', '==', selectedMonth));
+    const unsub = onSnapshot(q, (snap) => {
+      const pList: SalaryPayment[] = [];
+      snap.forEach(d => pList.push({ id: d.id, ...d.data() } as SalaryPayment));
+      setPayments(pList);
+    }, (err) => {
+      console.warn("Admin payments listener warning:", err);
+    });
+
+    return () => unsub();
+  }, [selectedMonth, isAccountantOrAdmin]);
+
+  // Real-time listener for Teacher's Own Salary Records
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+
+    const unsubs: (() => void)[] = [];
+    const paymentsMap = new Map<string, SalaryPayment>();
+
+    const updateTeacherPaymentsState = () => {
+      const list = Array.from(paymentsMap.values());
+      list.sort((a, b) => (b.month || '').localeCompare(a.month || ''));
+      setTeacherPayments(list);
+    };
+
+    // Branch A: Query by teacherUid == currentUser.uid
+    try {
+      const qUid = query(collection(db, 'salary_payments'), where('teacherUid', '==', currentUser.uid));
+      const unsubUid = onSnapshot(qUid, (snap) => {
+        snap.forEach(d => paymentsMap.set(d.id, { id: d.id, ...d.data() } as SalaryPayment));
+        updateTeacherPaymentsState();
+      }, (err) => {
+        console.warn("Teacher salary by teacherUid onSnapshot:", err);
+      });
+      unsubs.push(unsubUid);
+    } catch (e) {
+      console.warn("Failed query by teacherUid:", e);
+    }
+
+    // Branch B: Query by teacherId (from myLinkedTeacher or userProfile)
+    const effectiveTeacherId = myLinkedTeacher?.teacherId || userProfile?.teacherId;
+    if (effectiveTeacherId) {
+      try {
+        const qTid = query(collection(db, 'salary_payments'), where('teacherId', '==', effectiveTeacherId));
+        const unsubTid = onSnapshot(qTid, (snap) => {
+          snap.forEach(d => paymentsMap.set(d.id, { id: d.id, ...d.data() } as SalaryPayment));
+          updateTeacherPaymentsState();
+        }, (err) => {
+          console.warn("Teacher salary by teacherId onSnapshot:", err);
+        });
+        unsubs.push(unsubTid);
+      } catch (e) {
+        console.warn("Failed query by teacherId:", e);
+      }
+    }
+
+    return () => {
+      unsubs.forEach(u => u());
+    };
+  }, [currentUser?.uid, myLinkedTeacher?.teacherId, userProfile?.teacherId]);
+
+  const handleSaveSalarySetup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!setupSalaryTeacher) return;
+    setSavingSalarySetup(true);
+    try {
+      await updateDoc(doc(db, 'teachers', setupSalaryTeacher.id), {
+        baseSalary: Number(configuredBaseSalary),
+        isSalaryConfigured: true,
+        updatedAt: new Date().toISOString()
+      });
+      setFeedbackMessage(
+        isBn 
+          ? `${setupSalaryTeacher.fullName}-এর মূল বেতন সফলভাবে ৳${configuredBaseSalary} নির্ধারণ করা হয়েছে।`
+          : `Base salary for ${setupSalaryTeacher.fullName} successfully set to BDT ${configuredBaseSalary}.`
+      );
+      setTimeout(() => setFeedbackMessage(null), 4000);
+      setSetupSalaryTeacher(null);
+      await loadData();
+    } catch (err: any) {
+      alert((isBn ? 'বেতন সেটআপ ব্যর্থ: ' : 'Failed to setup salary: ') + err.message);
+    } finally {
+      setSavingSalarySetup(false);
+    }
+  };
 
   // Net payable calculation formula
   const payableTotal = baseSalary + allowances + bonus - advanceDeduction - otherDeduction;
@@ -229,6 +354,24 @@ export const TeacherSalaryPage: React.FC = () => {
         if (matchedUser) {
           teacherUid = matchedUser.uid;
         }
+      }
+
+      // Guarantee teacher document is permanently linked to auth UID
+      if (teacherUid && !selectedTeacher.userId) {
+        await updateDoc(doc(db, 'teachers', selectedTeacher.id), {
+          userId: teacherUid,
+          authUid: teacherUid,
+          updatedAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+
+      // Guarantee user document is permanently linked to teacherId
+      if (teacherUid) {
+        await updateDoc(doc(db, 'users', teacherUid), {
+          teacherId: selectedTeacher.teacherId,
+          teacherDocId: selectedTeacher.id,
+          updatedAt: new Date().toISOString()
+        }).catch(() => {});
       }
 
       const paymentRecord: Omit<SalaryPayment, 'id'> = {
@@ -515,6 +658,16 @@ export const TeacherSalaryPage: React.FC = () => {
               >
                 <FileSpreadsheet className="w-4 h-4" />
                 <span>{isBn ? 'এক্সেল' : 'Export'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAuthoritySignatureModal(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-xs transition"
+                title={isBn ? 'মুহতামিম ও কর্তৃপক্ষের অফিসিয়াল স্বাক্ষর সেটিংস' : 'Authority Signature Settings'}
+              >
+                <PenTool className="w-3.5 h-3.5 text-amber-300" />
+                <span>{isBn ? 'কর্তৃপক্ষের স্বাক্ষর' : 'Authority Sign'}</span>
               </button>
             </>
           )}
@@ -878,8 +1031,39 @@ export const TeacherSalaryPage: React.FC = () => {
                             <p className="text-slate-800">{teacher.designation}</p>
                             <p className="text-[10px] text-slate-400">{teacher.department}</p>
                           </td>
-                          <td className="py-3 px-3 text-right font-bold text-slate-800">
-                            {formatBDT(teacher.baseSalary || 0, isBn)}
+                          <td className="py-3 px-3 text-right">
+                            {teacher.isSalaryConfigured === false ? (
+                              <div className="space-y-1">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  {isBn ? 'বেতন সেটআপ প্রয়োজন' : 'Salary Setup Required'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSetupSalaryTeacher(teacher);
+                                    setConfiguredBaseSalary(teacher.baseSalary || 12000);
+                                  }}
+                                  className="block ml-auto text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline"
+                                >
+                                  {isBn ? '⚙️ বেতন নির্ধারণ' : '⚙️ Setup Salary'}
+                                </button>
+                              </div>
+                            ) : (
+                              <div>
+                                <span className="font-bold text-slate-800">{formatBDT(teacher.baseSalary || 0, isBn)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSetupSalaryTeacher(teacher);
+                                    setConfiguredBaseSalary(teacher.baseSalary || 12000);
+                                  }}
+                                  className="block ml-auto text-[9px] text-slate-400 hover:text-blue-600"
+                                  title={isBn ? 'মূল বেতন পরিবর্তন করুন' : 'Edit Base Salary'}
+                                >
+                                  {isBn ? 'পরিবর্তন' : 'Edit'}
+                                </button>
+                              </div>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-center">
                             {isPaid ? (
@@ -1200,14 +1384,85 @@ export const TeacherSalaryPage: React.FC = () => {
         <SalaryReceiptModal
           payment={selectedPayslip}
           onClose={() => setSelectedPayslip(null)}
-          settings={{
-            institutionName: settings.institutionName,
-            institutionNameEn: settings.institutionNameEn,
-            address: settings.address,
-            phone: settings.phone
-          }}
+          settings={settings}
           language={language}
+          onEditSignatory={isAccountantOrAdmin ? () => setShowAuthoritySignatureModal(true) : undefined}
         />
+      )}
+
+      {/* =========================================================================
+          AUTHORITY SIGNATURE SETTINGS MODAL
+          ========================================================================= */}
+      <AuthoritySignatureModal
+        isOpen={showAuthoritySignatureModal}
+        onClose={() => setShowAuthoritySignatureModal(false)}
+      />
+
+      {/* =========================================================================
+          SECTION F: SALARY POLICY & SETUP MODAL (Requirement 3.D)
+          ========================================================================= */}
+      {setupSalaryTeacher && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-2.5">
+              <h3 className="font-bold text-sm text-slate-900 flex items-center space-x-1.5">
+                <Wallet className="w-4 h-4 text-blue-600" />
+                <span>{isBn ? 'শিক্ষক মূল বেতন নির্ধারণ' : 'Configure Base Salary'}</span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSetupSalaryTeacher(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl space-y-1 text-xs">
+              <p><b>{isBn ? 'শিক্ষক:' : 'Teacher:'}</b> {setupSalaryTeacher.fullName}</p>
+              <p><b>{isBn ? 'আইডি:' : 'ID:'}</b> <span className="font-mono text-blue-600">{setupSalaryTeacher.teacherId}</span></p>
+              <p><b>{isBn ? 'পদবি ও বিভাগ:' : 'Designation:'}</b> {setupSalaryTeacher.designation} {setupSalaryTeacher.department ? `(${setupSalaryTeacher.department})` : ''}</p>
+            </div>
+
+            <form onSubmit={handleSaveSalarySetup} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold mb-1 text-slate-700">
+                  {isBn ? 'মাসিক মূল বেতন (৳)*' : 'Monthly Base Salary (BDT)*'}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="500"
+                  value={configuredBaseSalary}
+                  onChange={(e) => setConfiguredBaseSalary(Number(e.target.value))}
+                  required
+                  className="w-full px-3 py-2 border rounded-xl font-bold text-slate-900 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  {isBn ? 'নির্ধারিত মূল বেতন পরবর্তী প্রতিটি মাসের পে-রোলে স্বয়ংক্রিয়ভাবে ব্যবহৃত হবে।' : 'Configured salary will be used in future payrolls.'}
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setSetupSalaryTeacher(null)}
+                  disabled={savingSalarySetup}
+                  className="px-3.5 py-1.5 border rounded-xl text-xs text-slate-600"
+                >
+                  {isBn ? 'বাতিল' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingSalarySetup}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                >
+                  {savingSalarySetup ? (isBn ? 'সংরক্ষণ হচ্ছে...' : 'Saving...') : (isBn ? 'বেতন সংরক্ষণ করুন' : 'Save Salary')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
     </div>

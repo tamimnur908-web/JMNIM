@@ -32,6 +32,11 @@ export const DEFAULT_SETTINGS: InstitutionSettings = {
   autoCheckOutNotifyTeacher: true,
   missedCheckOutNotifyAdmin: true,
   missedCheckOutNotifyTeacher: true,
+  authorizedSignatoryName: "মাওলানা তামিম নূর",
+  authorizedSignatoryTitle: "মুহতামিম / প্রধান হিসাবরক্ষক",
+  authorizedSignatoryType: "text",
+  authorizedSignatorySignatureUrl: "",
+  authorizedSignatorySealUrl: "",
 };
 
 interface SettingsContextType {

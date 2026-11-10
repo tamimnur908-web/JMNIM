@@ -77,6 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
         }
         if (notif.salaryPaymentId) {
           sessionStorage.setItem('open_salary_payment_id', notif.salaryPaymentId);
+          window.dispatchEvent(new CustomEvent('open_salary_payment', { detail: { paymentId: notif.salaryPaymentId } }));
         }
         onNavigate(notif.linkPage);
       }

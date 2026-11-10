@@ -133,6 +133,15 @@ export interface InstitutionSettings {
     day_care: number;
   };
   approverUids?: string[]; // UIDs of Admins/Principals authorized by Super Admin to approve registrations
+  // Authorized Signatory & Official Signature Settings (মুহতামিম / প্রধান হিসাবরক্ষক)
+  authorizedSignatoryName?: string; // e.g. "মাওলানা তামিম নূর"
+  authorizedSignatoryTitle?: string; // e.g. "মুহতামিম / প্রধান হিসাবরক্ষক"
+  authorizedSignatoryType?: 'image' | 'drawn' | 'text';
+  authorizedSignatorySignatureUrl?: string; // Data URL or storage URL
+  authorizedSignatorySealUrl?: string; // Official madrasa seal/stamp URL
+  authorizedSignatoryPhone?: string;
+  authorizedSignatoryUpdatedBy?: string;
+  authorizedSignatoryUpdatedAt?: string;
   // Auto Check-out and Missed Check-out Settings
   autoCheckOutEnabled?: boolean;
   autoCheckOutWaitingMinutes?: number; // Additional waiting period in minutes (e.g. 30)

@@ -15,6 +15,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
+  provisionApprovedUser, 
+  findRepairCandidates, 
+  RepairCandidate, 
+  generateNextTeacherId 
+} from '../services/userProvisioningService';
+import { 
   ShieldCheck, 
   UserCheck, 
   UserX, 
@@ -168,7 +174,9 @@ export const UserApprovalsPage: React.FC = () => {
   const { settings, updateSettings } = useSettings();
   const isBn = language === 'bn';
 
-  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'approvers'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'users' | 'sync_repair' | 'approvers'>('pending');
+  const [showBatchRepairConfirm, setShowBatchRepairConfirm] = useState(false);
+  const [batchRepairProgress, setBatchRepairProgress] = useState<{ current: number; total: number; message: string } | null>(null);
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -408,43 +416,46 @@ export const UserApprovalsPage: React.FC = () => {
     setRejectionReason('');
     setActionSuccess(null);
 
-    // Initialize teacher linking state (Requirement 1)
+    // Initialize teacher linking state intelligently
     const targetUid = (user as any).uid || (user as any).id;
     const existingTeacherId = (user as UserProfile).teacherId;
     const existingTeacherDocId = (user as UserProfile).teacherDocId;
 
+    let matched: Teacher | undefined;
     if (existingTeacherDocId) {
-      setSelectedTeacherDocId(existingTeacherDocId);
-      setTeacherLinkMode('existing');
+      matched = teachers.find(t => t.id === existingTeacherDocId);
     } else if (existingTeacherId) {
-      const match = teachers.find(t => t.teacherId === existingTeacherId);
-      setSelectedTeacherDocId(match ? match.id : '');
-      setTeacherLinkMode('existing');
+      matched = teachers.find(t => t.teacherId === existingTeacherId);
     } else {
-      const linkedToMe = teachers.find(t => t.userId === targetUid);
-      if (linkedToMe) {
-        setSelectedTeacherDocId(linkedToMe.id);
-        setTeacherLinkMode('existing');
-      } else {
-        const unlinked = teachers.filter(t => !t.userId || t.userId === '');
-        if (unlinked.length > 0) {
-          setSelectedTeacherDocId(unlinked[0].id);
-          setTeacherLinkMode('existing');
-        } else {
-          setSelectedTeacherDocId('');
-          setTeacherLinkMode('new');
+      matched = teachers.find(t => t.userId === targetUid || (t as any).authUid === targetUid);
+      if (!matched && user.email) {
+        const lower = user.email.toLowerCase().trim();
+        matched = teachers.find(t => t.email && t.email.toLowerCase().trim() === lower);
+      }
+      if (!matched && user.phoneNumber) {
+        const digits = user.phoneNumber.replace(/\D/g, '');
+        if (digits.length >= 8) {
+          matched = teachers.find(t => t.phone && t.phone.replace(/\D/g, '') === digits);
         }
       }
     }
 
+    if (matched) {
+      setSelectedTeacherDocId(matched.id);
+      setTeacherLinkMode('existing');
+    } else {
+      setSelectedTeacherDocId('');
+      setTeacherLinkMode('new');
+    }
+
     setNewTeacherForm({
-      teacherId: (user as UserProfile).teacherId || `T-${Math.floor(100 + Math.random() * 900)}`,
-      fullName: user.displayName || '',
-      phone: user.phoneNumber || '',
-      designation: 'সহকারী শিক্ষক',
-      department: 'হিফজ',
-      baseSalary: 10000,
-      joiningDate: new Date().toISOString().split('T')[0]
+      teacherId: matched?.teacherId || (user as UserProfile).teacherId || generateNextTeacherId(teachers),
+      fullName: user.displayName || matched?.fullName || '',
+      phone: user.phoneNumber || matched?.phone || '',
+      designation: matched?.designation || (existingRole === 'principal' ? 'মুহতামিম / প্রধান শিক্ষক' : 'সহকারী শিক্ষক'),
+      department: matched?.department || 'সাধারণ',
+      baseSalary: matched?.baseSalary || 12000,
+      joiningDate: matched?.joiningDate || new Date().toISOString().split('T')[0]
     });
   };
 
@@ -473,130 +484,41 @@ export const UserApprovalsPage: React.FC = () => {
   const handleApprove = async () => {
     if (!selectedUser) return;
     setSaving(true);
+    setActionSuccess(null);
     try {
-      const uid = selectedUser.uid;
-      const now = new Date().toISOString();
+      const result = await provisionApprovedUser({
+        user: selectedUser,
+        assignedRole,
+        permissions,
+        approverUid: currentUser?.uid || 'Admin',
+        approverName: currentUser?.displayName || 'Authorized Approver',
+        existingTeachersList: teachers,
+        allUsersList: usersList,
+        explicitTeacherData: (assignedRole === 'teacher' || assignedRole === 'principal') ? {
+          teacherId: newTeacherForm.teacherId,
+          fullName: newTeacherForm.fullName,
+          phone: newTeacherForm.phone,
+          designation: newTeacherForm.designation,
+          department: newTeacherForm.department,
+          baseSalary: newTeacherForm.baseSalary,
+          joiningDate: newTeacherForm.joiningDate
+        } : undefined,
+        linkExistingTeacherDocId: teacherLinkMode === 'existing' ? selectedTeacherDocId : undefined
+      });
 
-      let finalTeacherId = (selectedUser as UserProfile).teacherId || null;
-      let finalTeacherDocId = (selectedUser as UserProfile).teacherDocId || null;
-
-      // Handle Teacher Profile Linking (Requirement 1)
-      if (assignedRole === 'teacher') {
-        if (teacherLinkMode === 'existing' && selectedTeacherDocId) {
-          const matchedTeacher = teachers.find(t => t.id === selectedTeacherDocId);
-          if (matchedTeacher) {
-            // Verify this account isn't linked to another teacher profile
-            const otherTeacherLinked = teachers.find(t => t.userId === uid && t.id !== matchedTeacher.id);
-            if (otherTeacherLinked) {
-              await updateDoc(doc(db, 'teachers', otherTeacherLinked.id), {
-                userId: null,
-                authUid: null,
-                updatedAt: now
-              });
-            }
-
-            finalTeacherId = matchedTeacher.teacherId;
-            finalTeacherDocId = matchedTeacher.id;
-
-            await updateDoc(doc(db, 'teachers', matchedTeacher.id), {
-              userId: uid,
-              authUid: uid,
-              linkedAt: now,
-              linkedBy: currentUser?.displayName || 'Authorized Approver',
-              linkedEmail: selectedUser.email || '',
-              updatedAt: now
-            });
-          }
-        } else if (teacherLinkMode === 'new') {
-          const genId = newTeacherForm.teacherId.trim() || `T-${Math.floor(100 + Math.random() * 900)}`;
-          const newDocRef = await addDoc(collection(db, 'teachers'), {
-            teacherId: genId,
-            fullName: newTeacherForm.fullName.trim() || selectedUser.displayName,
-            phone: newTeacherForm.phone.trim() || selectedUser.phoneNumber || '',
-            email: selectedUser.email || '',
-            designation: newTeacherForm.designation.trim() || 'সহকারী শিক্ষক',
-            department: newTeacherForm.department.trim() || 'হিফজ',
-            baseSalary: Number(newTeacherForm.baseSalary) || 10000,
-            joiningDate: newTeacherForm.joiningDate || now.split('T')[0],
-            employmentStatus: 'active',
-            salaryType: 'monthly',
-            userId: uid,
-            authUid: uid,
-            linkedAt: now,
-            linkedBy: currentUser?.displayName || 'Authorized Approver',
-            createdAt: now,
-            updatedAt: now
-          });
-          finalTeacherId = genId;
-          finalTeacherDocId = newDocRef.id;
-        } else if (teacherLinkMode === 'later') {
-          finalTeacherId = null;
-          finalTeacherDocId = null;
-        }
+      if (result.success) {
+        setActionSuccess(
+          isBn 
+            ? 'ব্যবহারকারী সফলভাবে অনুমোদিত হয়েছে এবং সংশ্লিষ্ট মডিউলগুলোতে যুক্ত করা হয়েছে।' 
+            : 'User approved and provisioned across all modules successfully.'
+        );
+        setTimeout(() => {
+          setSelectedUser(null);
+          loadData();
+        }, 1200);
+      } else {
+        alert(result.message + (result.error ? ` (${result.error})` : ''));
       }
-
-      // 1. Update user profile document in `users` collection
-      const userDocRef = doc(db, 'users', uid);
-      await updateDoc(userDocRef, {
-        status: 'active',
-        accountStatus: 'active',
-        approvalStatus: 'approved',
-        role: assignedRole,
-        permissions: permissions,
-        teacherId: finalTeacherId,
-        teacherDocId: finalTeacherDocId,
-        approvedBy: currentUser?.uid || 'Admin',
-        approvedByName: currentUser?.displayName || 'Authorized Approver',
-        approvedAt: now,
-        updatedAt: now
-      });
-
-      // 2. Update registration request document
-      const reqDocRef = doc(db, 'registration_requests', uid);
-      await updateDoc(reqDocRef, {
-        status: 'approved',
-        accountStatus: 'active',
-        approvalStatus: 'approved',
-        assignedRole: assignedRole,
-        assignedPermissions: permissions,
-        reviewedBy: currentUser?.uid || 'Admin',
-        reviewedByName: currentUser?.displayName || 'Authorized Approver',
-        reviewedAt: now
-      }).catch(() => {
-        // Doc might not exist if editing an approved user
-      });
-
-      // 3. Log Audit
-      await logAudit({
-        action: 'User Approved & Permissions Assigned',
-        module: 'User Approvals & Access Control',
-        recordId: uid,
-        recordType: 'UserProfile',
-        performedBy: currentUser?.displayName || 'Authorized Approver',
-        performedByRole: role || 'admin',
-        performedByUid: currentUser?.uid,
-        details: `ইউজার ${selectedUser.displayName} (${selectedUser.email || selectedUser.phoneNumber || ''}) অনুমোদিত হয়েছে। নির্ধারিত রোল: ${assignedRole}`
-      });
-
-      // 4. Notify Applicant of Approval
-      try {
-        await addDoc(collection(db, 'notifications'), {
-          title: 'আপনার অ্যাকাউন্ট অনুমোদিত হয়েছে!',
-          message: `মুবারকবাদ! মাদরাসা কর্তৃপক্ষ আপনার নিবন্ধন অনুমোদন করেছেন। নির্ধারিত রোল: ${assignedRole.toUpperCase()}`,
-          type: 'approval_result',
-          targetUid: uid,
-          read: false,
-          createdAt: now
-        });
-      } catch (nErr) {
-        console.warn("Could not send applicant notification:", nErr);
-      }
-
-      setActionSuccess(isBn ? 'ইউজার সফলভাবে অনুমোদিত ও সক্রিয় করা হয়েছে।' : 'User approved and activated successfully.');
-      setTimeout(() => {
-        setSelectedUser(null);
-        loadData();
-      }, 1000);
     } catch (err: any) {
       alert((isBn ? 'অনুমোদনে সমস্যা: ' : 'Approval error: ') + err.message);
     } finally {
@@ -669,6 +591,89 @@ export const UserApprovalsPage: React.FC = () => {
       alert((isBn ? 'প্রত্যাখ্যানে সমস্যা: ' : 'Rejection error: ') + err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Sync & Repair Hub Execution (Requirement 6)
+  const syncCandidates = findRepairCandidates(usersList, teachers);
+
+  const handleExecuteBatchRepair = async () => {
+    if (syncCandidates.length === 0) return;
+    setRepairing(true);
+    setRepairSuccessMsg(null);
+    let repairedCount = 0;
+    const errorsList: string[] = [];
+
+    for (let i = 0; i < syncCandidates.length; i++) {
+      const candidate = syncCandidates[i];
+      setBatchRepairProgress({
+        current: i + 1,
+        total: syncCandidates.length,
+        message: `${candidate.user.displayName} সিঙ্ক ও মেরামত হচ্ছে...`
+      });
+
+      try {
+        const u = candidate.user;
+        const res = await provisionApprovedUser({
+          user: u,
+          assignedRole: u.role || 'teacher',
+          permissions: u.permissions || PRESETS[u.role || 'teacher'] || {},
+          approverUid: currentUser?.uid || 'Admin',
+          approverName: currentUser?.displayName || 'Authorized Approver',
+          existingTeachersList: teachers,
+          allUsersList: usersList,
+          linkExistingTeacherDocId: candidate.matchedTeacher?.id
+        });
+        if (res.success) {
+          repairedCount++;
+        } else {
+          errorsList.push(`${u.displayName}: ${res.error || 'Partial'}`);
+        }
+      } catch (err: any) {
+        errorsList.push(`${candidate.user.displayName}: ${err.message}`);
+      }
+    }
+
+    setRepairing(false);
+    setBatchRepairProgress(null);
+    setShowBatchRepairConfirm(false);
+    setRepairSuccessMsg(
+      isBn
+        ? `সফলভাবে ${repairedCount} জন অনুমোদিত ইউজারের প্রোফাইল সংশ্লিষ্ট সকল মডিউলে সিঙ্ক ও মেরামত সম্পন্ন হয়েছে।`
+        : `Successfully synchronized and repaired ${repairedCount} user accounts.`
+    );
+    await loadData();
+  };
+
+  const handleExecuteSingleRepair = async (candidate: RepairCandidate) => {
+    setRepairing(true);
+    setRepairSuccessMsg(null);
+    try {
+      const u = candidate.user;
+      const res = await provisionApprovedUser({
+        user: u,
+        assignedRole: u.role || 'teacher',
+        permissions: u.permissions || PRESETS[u.role || 'teacher'] || {},
+        approverUid: currentUser?.uid || 'Admin',
+        approverName: currentUser?.displayName || 'Authorized Approver',
+        existingTeachersList: teachers,
+        allUsersList: usersList,
+        linkExistingTeacherDocId: candidate.matchedTeacher?.id
+      });
+      if (res.success) {
+        setRepairSuccessMsg(
+          isBn
+            ? `${u.displayName}-এর প্রোফাইল সংশ্লিষ্ট সকল মডিউলে সিঙ্ক ও মেরামত সম্পন্ন হয়েছে।`
+            : `Successfully repaired and synchronized ${u.displayName}.`
+        );
+        await loadData();
+      } else {
+        alert(res.message);
+      }
+    } catch (err: any) {
+      alert((isBn ? 'মেরামতে ত্রুটি: ' : 'Repair error: ') + err.message);
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -834,6 +839,21 @@ export const UserApprovalsPage: React.FC = () => {
           >
             <Users className="w-3.5 h-3.5" />
             <span>{isBn ? "সকল ইউজার ও পারমিশন" : "All Users & Access"}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('sync_repair')}
+            className={`px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition ${
+              activeTab === 'sync_repair' ? 'bg-white text-purple-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5 text-purple-600" />
+            <span>{isBn ? "সিঙ্ক ও মেরামত হাব" : "Sync & Repair Hub"}</span>
+            {syncCandidates.length > 0 && (
+              <span className="w-5 h-5 rounded-full bg-purple-600 text-white text-[10px] flex items-center justify-center font-black animate-pulse">
+                {syncCandidates.length}
+              </span>
+            )}
           </button>
 
           {isSuperAdmin && (
@@ -1227,7 +1247,222 @@ export const UserApprovalsPage: React.FC = () => {
       )}
 
       {/* ============================================================== */}
-      {/* TAB 3: APPROVER DELEGATION (Super Admin Only)                 */}
+      {/* TAB 3: SYSTEM SYNCHRONIZATION & REPAIR HUB (Requirement 6)     */}
+      {/* ============================================================== */}
+      {activeTab === 'sync_repair' && (
+        <div className="space-y-5 animate-fadeIn">
+          {/* Summary Metric Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+              <span className="text-xs text-slate-500 block">{isBn ? "মোট অনুমোদিত ইউজার" : "Total Approved Users"}</span>
+              <span className="text-xl font-black text-slate-900">
+                {usersList.filter(u => u.status === 'active' || u.approvalStatus === 'approved').length} {isBn ? "জন" : ""}
+              </span>
+            </div>
+
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-200 shadow-xs">
+              <span className="text-xs text-blue-800 block">{isBn ? "টিচার ম্যানেজমেন্টে প্রোফাইল" : "In Teacher Management"}</span>
+              <span className="text-xl font-black text-blue-900">{teachers.length} {isBn ? "জন" : ""}</span>
+            </div>
+
+            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 shadow-xs">
+              <span className="text-xs text-emerald-800 block">{isBn ? "শতভাগ সিঙ্কড ও সক্রিয়" : "Fully Synced & Active"}</span>
+              <span className="text-xl font-black text-emerald-900">
+                {usersList.filter(u => (u.status === 'active' || u.approvalStatus === 'approved') && !syncCandidates.some(c => c.user.uid === u.uid)).length} {isBn ? "জন" : ""}
+              </span>
+            </div>
+
+            <div className={`p-4 rounded-2xl border shadow-xs transition ${
+              syncCandidates.length > 0 ? "bg-amber-50 border-amber-300" : "bg-slate-50 border-slate-200"
+            }`}>
+              <span className={`text-xs block ${syncCandidates.length > 0 ? "text-amber-800 font-bold" : "text-slate-500"}`}>
+                {isBn ? "মেরামতযোগ্য অ্যাকাউন্ট" : "Accounts Needing Repair"}
+              </span>
+              <span className={`text-xl font-black ${syncCandidates.length > 0 ? "text-amber-900" : "text-slate-700"}`}>
+                {syncCandidates.length} {isBn ? "টি রেকর্ড" : "records"}
+              </span>
+            </div>
+          </div>
+
+          {/* Feedback Success Message */}
+          {repairSuccessMsg && (
+            <div className="p-3.5 bg-emerald-100 border border-emerald-300 text-emerald-950 rounded-xl text-xs font-semibold flex items-center space-x-2 animate-fadeIn">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span>{repairSuccessMsg}</span>
+            </div>
+          )}
+
+          {/* Controlled Repair Preview Card */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center space-x-2">
+                  <Wrench className="w-4 h-4 text-purple-600" />
+                  <span>{isBn ? "অনুমোদিত ইউজার মডিউল সিঙ্ক ও মেরামত প্রিভিউ" : "User Module Synchronization & Repair Preview"}</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isBn 
+                    ? "অনুমোদিত হওয়া সত্ত্বেও যেসকল শিক্ষকের টিচার ম্যানেজমেন্ট, জিপিএস হাজিরা বা পে-রোল প্রোফাইল অনুপস্থিত, তা নিচে প্রদর্শিত হয়েছে।"
+                    : "Detects approved users with missing teacher profiles, GPS attendance linkages, or payroll records."}
+                </p>
+              </div>
+
+              {syncCandidates.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowBatchRepairConfirm(true)}
+                  disabled={repairing}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition flex items-center space-x-2 shrink-0 disabled:opacity-50 shadow-sm"
+                >
+                  {repairing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  <span>{isBn ? "সকল ইউজার এক ক্লিকে সিঙ্ক ও মেরামত করুন" : "Sync & Repair All Users"}</span>
+                </button>
+              )}
+            </div>
+
+            {batchRepairProgress && (
+              <div className="p-4 bg-purple-50 border-b border-purple-200 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-purple-900">
+                  <span>{batchRepairProgress.message}</span>
+                  <span>{batchRepairProgress.current} / {batchRepairProgress.total}</span>
+                </div>
+                <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-purple-600 h-2 transition-all duration-300" 
+                    style={{ width: `${(batchRepairProgress.current / batchRepairProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {syncCandidates.length === 0 ? (
+              <div className="p-12 text-center space-y-2">
+                <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
+                <h4 className="text-base font-bold text-slate-800">
+                  {isBn ? "আলহামদুলিল্লাহ! সকল অ্যাকাউন্ট সম্পূর্ণ সিঙ্কড রয়েছে" : "All Accounts Perfectly Synchronized"}
+                </h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  {isBn 
+                    ? "সকল অনুমোদিত শিক্ষকের প্রোফাইল টিচার ম্যানেজমেন্ট, জিপিএস হাজিরা এবং বেতন ও পে-রোল মডিউলে সক্রিয়ভাবে যুক্ত আছে।"
+                    : "Every approved teacher has an active profile linked across Teacher Management, Attendance, and Payroll."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                      <th className="py-3 px-4">#</th>
+                      <th className="py-3 px-4">{isBn ? "ইউজার ও আইডি" : "User & UID"}</th>
+                      <th className="py-3 px-4">{isBn ? "রোল ও যোগাযোগ" : "Role & Contact"}</th>
+                      <th className="py-3 px-4">{isBn ? "সনাক্তকৃত সমস্যা" : "Detected Issues"}</th>
+                      <th className="py-3 px-4">{isBn ? "প্রস্তাবিত স্বয়ংক্রিয় সমাধান" : "Proposed Action"}</th>
+                      <th className="py-3 px-4 text-right">{isBn ? "পদক্ষেপ" : "Action"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {syncCandidates.map((candidate, idx) => (
+                      <tr key={candidate.user.uid} className="hover:bg-slate-50/80 transition">
+                        <td className="py-3.5 px-4 text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-bold text-slate-900">{candidate.user.displayName}</p>
+                          <span className="font-mono text-[10px] text-slate-400 block">{candidate.user.uid}</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 uppercase block w-fit mb-1">
+                            {candidate.user.role}
+                          </span>
+                          <span className="text-[11px] text-slate-600">{candidate.user.email || candidate.user.phoneNumber || '-'}</span>
+                        </td>
+                        <td className="py-3.5 px-4 space-y-1">
+                          {candidate.issues.map((iss, i) => (
+                            <div key={i} className="flex items-center space-x-1.5 text-amber-700 text-[11px] font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                              <span>{iss}</span>
+                            </div>
+                          ))}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {candidate.proposedAction === 'link_existing' ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <Link className="w-3.5 h-3.5 text-blue-600" />
+                              <span>{isBn ? `বিদ্যমান প্রোফাইল লিংক: ${candidate.matchedTeacher?.teacherId}` : `Link Profile: ${candidate.matchedTeacher?.teacherId}`}</span>
+                            </span>
+                          ) : candidate.proposedAction === 'create_new_teacher' ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                              <UserPlus className="w-3.5 h-3.5 text-purple-600" />
+                              <span>{isBn ? "নতুন শিক্ষক প্রোফাইল তৈরি ও সকল মডিউলে সিঙ্ক" : "Create Profile & Auto-Sync Modules"}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              <ShieldCheck className="w-3.5 h-3.5 text-slate-600" />
+                              <span>{isBn ? "পারমিশন ও মেটাডাটা সিঙ্ক" : "Sync Permissions & Metadata"}</span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleExecuteSingleRepair(candidate)}
+                            disabled={repairing}
+                            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition inline-flex items-center space-x-1 disabled:opacity-50 shadow-2xs"
+                          >
+                            <Wrench className="w-3.5 h-3.5" />
+                            <span>{isBn ? "সিঙ্ক করুন" : "Sync"}</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Batch Repair Confirmation Dialog Modal */}
+          {showBatchRepairConfirm && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+                <div className="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mx-auto">
+                  <Wrench className="w-6 h-6" />
+                </div>
+                <div className="text-center space-y-2">
+                  <h4 className="text-base font-bold text-slate-900">
+                    {isBn ? "অনুমোদিত ইউজার স্বয়ংক্রিয় সিঙ্ক ও মেরামত নিশ্চিতকরণ" : "Confirm Batch Synchronization & Repair"}
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {isBn
+                      ? `আপনি কি নিশ্চিত যে আপনি সনাক্তকৃত ${syncCandidates.length} জন অনুমোদিত ইউজারের প্রোফাইল সংশ্লিষ্ট সকল মডিউলে (টিচার ম্যানেজমেন্ট, জিপিএস হাজিরা এবং পে-রোল) স্বয়ংক্রিয়ভাবে তৈরি ও সিঙ্ক করতে চান? কোনো পূর্ববর্তী রেকর্ড মুছে যাবে না।`
+                      : `Are you sure you want to provision and synchronize all ${syncCandidates.length} approved users across ERP modules? Existing history will be safely preserved.`}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center space-x-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setShowBatchRepairConfirm(false)}
+                    disabled={repairing}
+                    className="px-4 py-2 border rounded-xl text-xs text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    {isBn ? "বাতিল" : "Cancel"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecuteBatchRepair}
+                    disabled={repairing}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+                  >
+                    {repairing ? (isBn ? "সিঙ্ক হচ্ছে..." : "Syncing...") : (isBn ? "হ্যাঁ, মেরামত সম্পন্ন করুন" : "Yes, Execute Sync")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* TAB 4: APPROVER DELEGATION (Super Admin Only)                 */}
       {/* ============================================================== */}
       {activeTab === 'approvers' && isSuperAdmin && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
