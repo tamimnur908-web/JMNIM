@@ -93,8 +93,11 @@ export const TeacherAcknowledgmentModal: React.FC<TeacherAcknowledgmentModalProp
         updatedAt: now
       };
 
-      // 2. Update Firestore payment document
-      await updateDoc(doc(db, 'salary_payments', payment.id), updatePayload);
+      // 2. Update Firestore payment document with timeout protection
+      await Promise.race([
+        updateDoc(doc(db, 'salary_payments', payment.id), updatePayload),
+        new Promise((_, reject) => setTimeout(() => reject(new Error(isBn ? 'ডেটাবেজ আপডেট টাইমআউট হয়েছে।' : 'Database update timed out.')), 6000))
+      ]);
 
       // 3. Log Audit Record
       await logAudit({
