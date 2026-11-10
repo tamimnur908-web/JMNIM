@@ -89,9 +89,12 @@ export const TeacherAcknowledgmentModal: React.FC<TeacherAcknowledgmentModalProp
         acknowledgedByName: teacherName,
         acknowledgmentDeclaration: declarationText,
         acknowledgmentLanguage: language,
-        receiptNumber,
         updatedAt: now
       };
+
+      if (!payment.receiptNumber) {
+        updatePayload.receiptNumber = receiptNumber;
+      }
 
       // 2. Update Firestore payment document with timeout protection
       await Promise.race([

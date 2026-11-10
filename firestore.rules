@@ -251,15 +251,11 @@ service cloud.firestore {
       );
       allow create: if isActiveUser() && (isAccountant() || isPrincipal());
       allow update: if isSuperAdmin() || (
-        isActiveUser() && hasUserDoc() &&
-        (
-          (getUserData().teacherId != null && resource.data.teacherId == getUserData().teacherId) ||
-          (resource.data.teacherUid != null && resource.data.teacherUid == request.auth.uid)
-        ) &&
+        isActiveUser() &&
         (resource.data.acknowledgmentStatus != 'acknowledged') &&
         request.resource.data.acknowledgmentStatus == 'acknowledged' &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'voucherNumber', 'teacherId', 'teacherName', 'month', 'baseSalary',
+          'voucherNumber', 'month', 'baseSalary',
           'allowances', 'bonus', 'advanceDeduction', 'otherDeduction',
           'attendanceDeduction', 'payableAmount', 'paidAmount', 'balanceDue',
           'paymentDate', 'paymentMethod', 'preparedBy'
