@@ -33,6 +33,12 @@ service cloud.firestore {
       return isSuperAdmin() || (isAuthenticated() && hasUserDoc() && getUserData().role == 'principal');
     }
 
+    function isApprover() {
+      return isSuperAdmin() || (isAuthenticated() && hasUserDoc() && (
+        getUserData().role in ['admin', 'principal']
+      ));
+    }
+
     function isAccountant() {
       return isSuperAdmin() || (isAuthenticated() && hasUserDoc() && getUserData().role == 'accountant');
     }
@@ -58,24 +64,24 @@ service cloud.firestore {
     // 2. USERS COLLECTION (`users/{userId}`)
     // =========================================================================
     match /users/{userId} {
-      allow get: if isAuthenticated() && (request.auth.uid == userId || isPrincipal());
-      allow list: if isPrincipal();
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isApprover());
+      allow list: if isApprover();
 
       // Profile creation:
       // - Super Admin can create any profile
-      // - Ordinary user can create their own profile, but MUST have status == 'pending' and CANNOT set role == 'admin'
+      // - Ordinary user can create their own profile, but MUST have status in ['pending', 'pending_approval'] and CANNOT set role == 'admin'
       allow create: if isAuthenticated() && (
         isSuperAdmin() || (
           request.auth.uid == userId &&
-          request.resource.data.status == 'pending' &&
+          (request.resource.data.status in ['pending', 'pending_approval']) &&
           request.resource.data.role != 'admin'
         )
       );
 
       // Profile updates:
-      // - Super Admin & Authorized Principal can change role, status, permissions
+      // - Super Admin & Authorized Approver can change role, status, permissions
       // - Ordinary user can ONLY update their own personal display info (NOT role, status, or permissions)
-      allow update: if isSuperAdmin() || isPrincipal() || (
+      allow update: if isSuperAdmin() || isApprover() || (
         isAuthenticated() && request.auth.uid == userId &&
         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'permissions', 'teacherId'])
       );
@@ -87,14 +93,20 @@ service cloud.firestore {
     // 3. REGISTRATION REQUESTS (`registration_requests/{requestId}`)
     // =========================================================================
     match /registration_requests/{requestId} {
-      allow read: if isPrincipal() || (isAuthenticated() && request.auth.uid == requestId);
+      allow read: if isApprover() || (isAuthenticated() && request.auth.uid == requestId);
       allow create: if isAuthenticated() && (
         isSuperAdmin() || (
           request.resource.data.uid == request.auth.uid &&
-          request.resource.data.status == 'pending'
+          (request.resource.data.status in ['pending', 'pending_approval'])
         )
       );
-      allow update: if isPrincipal();
+      // Approver can approve/reject; Applicant can update their pending info without altering status
+      allow update: if isApprover() || (
+        isAuthenticated() && request.auth.uid == requestId &&
+        (resource.data.status in ['pending', 'pending_approval']) &&
+        (request.resource.data.status in ['pending', 'pending_approval']) &&
+        request.resource.data.uid == request.auth.uid
+      );
       allow delete: if isSuperAdmin();
     }
 
@@ -250,9 +262,18 @@ service cloud.firestore {
     }
 
     match /notifications/{notifId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.targetUid != null && resource.data.targetUid == request.auth.uid) ||
+        (resource.data.targetRole != null && isApprover()) ||
+        (!('targetUid' in resource.data) && !('targetRole' in resource.data))
+      );
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        isSuperAdmin() ||
+        (resource.data.targetUid != null && resource.data.targetUid == request.auth.uid) ||
+        isApprover()
+      );
       allow delete: if isSuperAdmin();
     }
 

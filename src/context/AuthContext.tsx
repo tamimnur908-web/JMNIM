@@ -21,7 +21,8 @@ import {
   ERPModule, 
   PermissionAction, 
   UserPermissions,
-  RegistrationRequest
+  RegistrationRequest,
+  isPendingStatus
 } from '../types';
 
 interface AuthContextType {
@@ -72,6 +73,56 @@ export const normalizePhoneNumber = (raw: string, countryCode: string = '+880'):
   return `${cleanCode}${cleaned}`;
 };
 
+// Helper to ensure registration request document and notification exist idempotently
+export const ensureRegistrationRequestAndNotify = async (
+  uid: string,
+  profile: Partial<UserProfile>,
+  method: 'email' | 'phone' | 'google'
+): Promise<void> => {
+  const isDefaultAdmin = uid === ADMIN_UID || (profile.email && profile.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+  if (isDefaultAdmin) return;
+
+  const reqDocRef = doc(db, 'registration_requests', uid);
+  const reqSnap = await getDoc(reqDocRef);
+
+  if (!reqSnap.exists()) {
+    const displayName = profile.displayName || (profile.phoneNumber ? `ব্যবহারকারী (${profile.phoneNumber})` : 'ইউজার');
+    const now = new Date().toISOString();
+    const regReq: RegistrationRequest = {
+      id: uid,
+      uid: uid,
+      displayName: displayName,
+      email: profile.email || undefined,
+      phoneNumber: profile.phoneNumber || undefined,
+      photoURL: profile.photoURL || undefined,
+      registrationMethod: method,
+      registrationDate: profile.createdAt || now,
+      status: 'pending',
+      approvalStatus: 'pending',
+      createdAt: profile.createdAt || now
+    };
+    await setDoc(reqDocRef, regReq);
+
+    // Create targeted notification for approvers
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        title: `নতুন ইউজার নিবন্ধন আবেদন (${method === 'google' ? 'Google' : method === 'phone' ? 'Mobile' : 'Email'})`,
+        message: `${displayName} (${profile.email || profile.phoneNumber || 'অ্যাকাউন্ট'}) সিস্টেম ব্যবহারের অনুমোদনের জন্য আবেদন করেছেন।`,
+        type: 'approval_request',
+        linkPage: 'userApprovals',
+        applicantUid: uid,
+        applicantName: displayName,
+        registrationMethod: method,
+        targetRole: ['admin', 'principal'],
+        read: false,
+        createdAt: now
+      });
+    } catch (nErr) {
+      console.warn("Could not write notification doc:", nErr);
+    }
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -92,10 +143,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (userDoc.exists()) {
         const data = userDoc.data() as UserProfile;
         const userRole: UserRole = isDefaultAdmin ? 'admin' : (data.role || 'staff');
-        // Existing accounts preserve their active status; Super Admin is always active
+        
+        // Strict pending check: If account is newly registered and waiting for approval, keep pending
+        const isPending = !isDefaultAdmin && (
+          isPendingStatus(data) ||
+          data.status === 'pending' ||
+          data.status === 'pending_approval' ||
+          data.approvalStatus === 'pending' ||
+          data.accountStatus === 'pending_approval' ||
+          (!data.approvedBy && (data.role === 'staff' || !data.role) && (!data.permissions || Object.keys(data.permissions).length === 0))
+        );
+
+        const isRej = !isDefaultAdmin && (data.status === 'rejected' || data.approvalStatus === 'rejected');
+
         const userStatus: UserStatus = isDefaultAdmin 
           ? 'active' 
-          : (data.status || 'active');
+          : (isRej ? 'rejected' : (isPending ? 'pending' : (data.status || 'active')));
+
         const currentPhoto = data.photoURL || userPhoto;
 
         const updateFields: Partial<UserProfile> = {};
@@ -117,6 +181,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           status: userStatus
         };
 
+        // IDEMPOTENT SELF-REPAIR: If account is pending, guarantee registration_requests document exists
+        if (userStatus === 'pending' && !isDefaultAdmin) {
+          try {
+            const method = resolvedProfile.registrationMethod || (user.providerData?.some(p => p.providerId === 'google.com') ? 'google' : 'email');
+            await ensureRegistrationRequestAndNotify(user.uid, resolvedProfile, method);
+          } catch (repairErr) {
+            console.warn("Could not auto-repair registration request doc:", repairErr);
+          }
+        }
+
         setUserProfile(resolvedProfile);
         setRole(userRole);
         setStatus(userStatus);
@@ -126,6 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const assignedStatus: UserStatus = isDefaultAdmin ? 'active' : 'pending';
         const defaultName = user.displayName 
           || (isDefaultAdmin ? 'প্রধান প্রশাসক (Admin)' : (user.phoneNumber ? `ব্যবহারকারী (${user.phoneNumber})` : 'ইউজার'));
+        const regMethod = user.providerData?.some(p => p.providerId === 'google.com') ? 'google' : 'email';
+        const now = new Date().toISOString();
 
         const newProfile: UserProfile = {
           uid: user.uid,
@@ -135,42 +211,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           photoURL: userPhoto,
           role: assignedRole,
           status: assignedStatus,
+          approvalStatus: isDefaultAdmin ? 'approved' : 'pending',
+          accountStatus: isDefaultAdmin ? 'active' : 'pending_approval',
           permissions: isDefaultAdmin ? undefined : {},
-          registrationMethod: user.providerData?.some(p => p.providerId === 'google.com') ? 'google' : 'email',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          registrationMethod: regMethod,
+          createdAt: now,
+          updatedAt: now
         };
 
         await setDoc(userDocRef, newProfile, { merge: true });
 
-        // If not super admin, create registration request & notification
+        // Save registration request and notification before confirming
         if (!isDefaultAdmin) {
-          try {
-            const regReq: RegistrationRequest = {
-              id: user.uid,
-              uid: user.uid,
-              displayName: defaultName,
-              email: user.email || undefined,
-              phoneNumber: user.phoneNumber || undefined,
-              photoURL: userPhoto || undefined,
-              registrationMethod: 'google',
-              registrationDate: new Date().toISOString(),
-              status: 'pending',
-              createdAt: new Date().toISOString()
-            };
-            await setDoc(doc(db, 'registration_requests', user.uid), regReq);
-
-            await addDoc(collection(db, 'notifications'), {
-              title: 'নতুন ইউজার নিবন্ধন আবেদন (Google)',
-              message: `${defaultName} (${user.email || 'Google Account'}) সিস্টেম ব্যবহারের অনুমোদনের জন্য আবেদন করেছেন।`,
-              type: 'approval_request',
-              linkPage: 'userApprovals',
-              read: false,
-              createdAt: new Date().toISOString()
-            });
-          } catch (reqErr) {
-            console.warn("Could not write registration request doc:", reqErr);
-          }
+          await ensureRegistrationRequestAndNotify(user.uid, newProfile, regMethod);
         }
 
         setUserProfile(newProfile);
@@ -237,6 +290,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       displayName: displayName.trim(),
       role: isDefaultAdmin ? 'admin' : 'staff',
       status: isDefaultAdmin ? 'active' : 'pending',
+      approvalStatus: isDefaultAdmin ? 'approved' : 'pending',
+      accountStatus: isDefaultAdmin ? 'active' : 'pending_approval',
       permissions: isDefaultAdmin ? undefined : {},
       registrationMethod: 'email',
       createdAt: new Date().toISOString(),
@@ -246,26 +301,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await setDoc(doc(db, 'users', cred.user.uid), newProfile);
 
     if (!isDefaultAdmin) {
-      const regReq: RegistrationRequest = {
-        id: cred.user.uid,
-        uid: cred.user.uid,
-        displayName: displayName.trim(),
-        email: cleanEmail,
-        registrationMethod: 'email',
-        registrationDate: new Date().toISOString(),
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'registration_requests', cred.user.uid), regReq);
-
-      await addDoc(collection(db, 'notifications'), {
-        title: 'নতুন ইউজার নিবন্ধন আবেদন (Email)',
-        message: `${displayName.trim()} (${cleanEmail}) সিস্টেম ব্যবহারের অনুমোদনের জন্য আবেদন করেছেন।`,
-        type: 'approval_request',
-        linkPage: 'userApprovals',
-        read: false,
-        createdAt: new Date().toISOString()
-      });
+      await ensureRegistrationRequestAndNotify(cred.user.uid, newProfile, 'email');
     }
 
     setUserProfile(newProfile);
@@ -295,6 +331,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       displayName: displayName.trim(),
       role: isDefaultAdmin ? 'admin' : 'staff',
       status: isDefaultAdmin ? 'active' : 'pending',
+      approvalStatus: isDefaultAdmin ? 'approved' : 'pending',
+      accountStatus: isDefaultAdmin ? 'active' : 'pending_approval',
       permissions: isDefaultAdmin ? undefined : {},
       registrationMethod: 'phone',
       createdAt: new Date().toISOString(),
@@ -304,26 +342,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await setDoc(doc(db, 'users', cred.user.uid), newProfile);
 
     if (!isDefaultAdmin) {
-      const regReq: RegistrationRequest = {
-        id: cred.user.uid,
-        uid: cred.user.uid,
-        displayName: displayName.trim(),
-        phoneNumber: phoneNumber.trim(),
-        registrationMethod: 'phone',
-        registrationDate: new Date().toISOString(),
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      };
-      await setDoc(doc(db, 'registration_requests', cred.user.uid), regReq);
-
-      await addDoc(collection(db, 'notifications'), {
-        title: 'নতুন ইউজার নিবন্ধন আবেদন (Mobile)',
-        message: `${displayName.trim()} (${phoneNumber.trim()}) মোবাইল নম্বর দিয়ে নিবন্ধন করেছেন। অনুমোদনের জন্য রিভিউ করুন।`,
-        type: 'approval_request',
-        linkPage: 'userApprovals',
-        read: false,
-        createdAt: new Date().toISOString()
-      });
+      await ensureRegistrationRequestAndNotify(cred.user.uid, newProfile, 'phone');
     }
 
     setUserProfile(newProfile);
@@ -339,7 +358,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await setPersistence(auth, browserLocalPersistence);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    await signInWithPopup(auth, provider);
+    const cred = await signInWithPopup(auth, provider);
+    if (cred.user) {
+      await fetchAndSyncProfile(cred.user);
+    }
   };
 
   const logout = async () => {
@@ -353,10 +375,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     currentUser && (role === 'admin' || isAdminUser(currentUser))
   );
 
-  const canApproveRegistrations = Boolean(
-    isSuperAdmin || role === 'principal'
-  );
-
   const hasPermission = (module: ERPModule, action: PermissionAction): boolean => {
     if (isSuperAdmin) return true;
     if (status !== 'active') return false;
@@ -365,6 +383,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!modulePerms || !Array.isArray(modulePerms)) return false;
     return modulePerms.includes(action);
   };
+
+  const canApproveRegistrations = Boolean(
+    isSuperAdmin || role === 'principal' || hasPermission('userApprovals', 'view') || hasPermission('userApprovals', 'approve')
+  );
 
   return (
     <AuthContext.Provider value={{ 

@@ -27,7 +27,7 @@ import { NoticeBoardPage } from './pages/NoticeBoardPage';
 import { CentralReportsPage } from './pages/CentralReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BackupRestorePage } from './pages/BackupRestorePage';
-import { ERPModule } from './types';
+import { ERPModule, isPendingStatus } from './types';
 
 const PAGE_MODULE_MAP: Record<string, ERPModule> = {
   dashboard: 'dashboard',
@@ -71,9 +71,16 @@ const MainLayout: React.FC = () => {
     return <LoginPage />;
   }
 
-  // CRITICAL REQUIREMENT 3: Block access before approval!
-  // If user is pending or rejected and not Super Admin, show PendingApprovalPage
-  if (!isSuperAdmin && userProfile && (userProfile.status === 'pending' || userProfile.status === 'rejected')) {
+  // CRITICAL REQUIREMENT: Block access before approval or if disabled/rejected!
+  // If user is pending, rejected, or disabled and not Super Admin, show PendingApprovalPage
+  if (!isSuperAdmin && userProfile && (
+    isPendingStatus(userProfile) || 
+    userProfile.status === 'rejected' || 
+    userProfile.approvalStatus === 'rejected' ||
+    userProfile.accountStatus === 'rejected' ||
+    userProfile.status === 'disabled' ||
+    userProfile.accountStatus === 'disabled'
+  )) {
     return <PendingApprovalPage />;
   }
 

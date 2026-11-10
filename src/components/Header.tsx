@@ -38,9 +38,19 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
     try {
       const snap = await getDocs(collection(db, 'notifications'));
       const list: NotificationItem[] = [];
-      snap.forEach(d => list.push({ id: d.id, ...d.data() } as NotificationItem));
+      snap.forEach(d => {
+        const n = { id: d.id, ...d.data() } as NotificationItem;
+        // User specific notification (e.g., approval/rejection results)
+        if (n.targetUid && n.targetUid !== currentUser?.uid) return;
+        // Role specific notification (e.g., approval requests to admin/principal)
+        if (n.targetRole && Array.isArray(n.targetRole)) {
+          const isApprover = isSuperAdmin || (role && n.targetRole.includes(role)) || (settings?.approverUids && currentUser?.uid && settings.approverUids.includes(currentUser.uid));
+          if (!isApprover) return;
+        }
+        list.push(n);
+      });
       list.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-      setNotifications(list.slice(0, 10));
+      setNotifications(list.slice(0, 15));
     } catch (err) {
       // safe fallback
     }
@@ -62,6 +72,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
       }
       if (notif.linkPage && onNavigate) {
         setNotifOpen(false);
+        if (notif.applicantUid) {
+          sessionStorage.setItem('open_approval_uid', notif.applicantUid);
+        }
         onNavigate(notif.linkPage);
       }
     } catch (err) {

@@ -1,6 +1,26 @@
 export type UserRole = 'admin' | 'principal' | 'teacher' | 'accountant' | 'staff';
 
-export type UserStatus = 'active' | 'pending' | 'rejected' | 'disabled';
+export type UserStatus = 'active' | 'pending' | 'pending_approval' | 'rejected' | 'disabled';
+
+export const isPendingStatus = (statusOrUser?: string | UserProfile | null): boolean => {
+  if (!statusOrUser) return false;
+  if (typeof statusOrUser === 'string') {
+    const s = statusOrUser.toLowerCase();
+    return s === 'pending' || s === 'pending_approval' || s === 'pending-approval';
+  }
+  const u = statusOrUser;
+  if (u.uid === 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3' || u.role === 'admin') return false;
+  const s = (u.status || '').toLowerCase();
+  const a = (u.approvalStatus || '').toLowerCase();
+  const ac = (u.accountStatus || '').toLowerCase();
+  if (s === 'pending' || s === 'pending_approval' || s === 'pending-approval') return true;
+  if (a === 'pending' || a === 'pending_approval') return true;
+  if (ac === 'pending' || ac === 'pending_approval') return true;
+  if (!u.approvedBy && (u.role === 'staff' || !u.role) && (!u.permissions || Object.keys(u.permissions).length === 0)) {
+    return true;
+  }
+  return false;
+};
 
 export type ERPModule = 
   | 'dashboard'
@@ -30,6 +50,8 @@ export interface UserProfile {
   role: UserRole;
   teacherId?: string;
   status: UserStatus;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  accountStatus?: 'pending_approval' | 'active' | 'disabled' | 'rejected';
   permissions?: UserPermissions;
   registrationMethod?: 'email' | 'phone' | 'google';
   approvedBy?: string;
@@ -49,7 +71,9 @@ export interface RegistrationRequest {
   photoURL?: string;
   registrationMethod: 'email' | 'phone' | 'google';
   registrationDate: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'pending_approval' | 'approved' | 'rejected';
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  accountStatus?: 'pending_approval' | 'active' | 'disabled' | 'rejected';
   assignedRole?: UserRole;
   assignedPermissions?: UserPermissions;
   reviewedBy?: string;
@@ -461,5 +485,10 @@ export interface NotificationItem {
   type: 'approval_request' | 'approval_result' | 'import_summary' | 'system';
   read: boolean;
   linkPage?: string;
+  targetRole?: UserRole[];
+  targetUid?: string;
+  applicantUid?: string;
+  applicantName?: string;
+  registrationMethod?: 'email' | 'phone' | 'google';
   createdAt: string;
 }

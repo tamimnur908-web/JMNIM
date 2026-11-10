@@ -7,7 +7,9 @@ import {
   getDocs, 
   doc, 
   updateDoc, 
-  setDoc,
+  setDoc, 
+  addDoc, 
+  onSnapshot, 
   query, 
   where 
 } from 'firebase/firestore';
@@ -29,7 +31,14 @@ import {
   Lock,
   ChevronRight,
   Shield,
-  Key
+  Key,
+  RefreshCw,
+  Wrench,
+  Check,
+  Ban,
+  Slash,
+  Eye,
+  CheckCircle
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -38,7 +47,8 @@ import {
   ERPModule, 
   PermissionAction, 
   UserPermissions, 
-  RegistrationRequest 
+  RegistrationRequest,
+  isPendingStatus
 } from '../types';
 import { logAudit } from '../utils/auditLogger';
 
@@ -158,6 +168,7 @@ export const UserApprovalsPage: React.FC = () => {
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Review Modal State
@@ -169,36 +180,191 @@ export const UserApprovalsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      // 1. Load Registration Requests
-      const reqSnap = await getDocs(collection(db, 'registration_requests'));
-      const reqList: RegistrationRequest[] = [];
-      reqSnap.forEach(d => {
-        reqList.push({ id: d.id, ...d.data() } as RegistrationRequest);
-      });
-      reqList.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
-      setRequests(reqList);
+  // Controlled Repair Preview State
+  const [repairCandidates, setRepairCandidates] = useState<UserProfile[]>([]);
+  const [repairing, setRepairing] = useState(false);
+  const [repairSuccessMsg, setRepairSuccessMsg] = useState<string | null>(null);
 
-      // 2. Load All User Profiles
-      const userSnap = await getDocs(collection(db, 'users'));
+  const processAndMergeData = (uList: UserProfile[], rSnapDocs: RegistrationRequest[]) => {
+    const reqMap = new Map<string, RegistrationRequest>();
+    rSnapDocs.forEach(d => {
+      reqMap.set(d.uid || d.id, d);
+    });
+
+    const candidates: UserProfile[] = [];
+    for (const u of uList) {
+      const isAdm = u.uid === 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3' || u.email?.toLowerCase() === 'tamimnur908@gmail.com';
+      if ((isPendingStatus(u.status) || isPendingStatus(u.accountStatus) || u.approvalStatus === 'pending') && !isAdm) {
+        if (!reqMap.has(u.uid)) {
+          candidates.push(u);
+          // Synthesize in-memory representation for display in pending list
+          const now = new Date().toISOString();
+          const fallbackMethod = u.registrationMethod || (u.email?.includes('@gmail.com') ? 'google' : (u.phoneNumber ? 'phone' : 'email'));
+          reqMap.set(u.uid, {
+            id: u.uid,
+            uid: u.uid,
+            displayName: u.displayName || 'ইউজার',
+            email: u.email,
+            phoneNumber: u.phoneNumber,
+            photoURL: u.photoURL,
+            registrationMethod: fallbackMethod,
+            registrationDate: u.createdAt || now,
+            status: 'pending',
+            createdAt: u.createdAt || now
+          });
+        }
+      }
+    }
+
+    setRepairCandidates(candidates);
+    const reqList = Array.from(reqMap.values());
+    reqList.sort((a, b) => ((b.registrationDate || b.createdAt) > (a.registrationDate || a.createdAt) ? 1 : -1));
+    setRequests(reqList);
+
+    // Auto-open review modal if user clicked an approval notification
+    const openUid = sessionStorage.getItem('open_approval_uid');
+    if (openUid) {
+      const target = reqList.find(r => r.uid === openUid || r.id === openUid) || uList.find(u => u.uid === openUid);
+      if (target) {
+        sessionStorage.removeItem('open_approval_uid');
+        openReviewModal(target);
+      }
+    }
+  };
+
+  // Real-time synchronization
+  useEffect(() => {
+    setLoading(true);
+    setFetchError(null);
+
+    let latestUsers: UserProfile[] = [];
+    let latestReqs: RegistrationRequest[] = [];
+
+    // Real-time listener for users
+    const unsubUsers = onSnapshot(collection(db, 'users'), (uSnap) => {
       const uList: UserProfile[] = [];
-      userSnap.forEach(d => {
-        uList.push({ ...d.data() } as UserProfile);
+      uSnap.forEach(d => {
+        uList.push({ uid: d.id, ...d.data() } as UserProfile);
       });
       uList.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+      latestUsers = uList;
       setUsersList(uList);
-    } catch (err) {
-      console.warn("Could not load registration requests:", err);
+      processAndMergeData(latestUsers, latestReqs);
+      setLoading(false);
+    }, (err) => {
+      console.warn("User onSnapshot error:", err);
+      setFetchError(err.message || 'ইউজার তথ্য লোড ব্যর্থ');
+      setLoading(false);
+    });
+
+    // Real-time listener for registration_requests
+    const unsubReqs = onSnapshot(collection(db, 'registration_requests'), (rSnap) => {
+      const rList: RegistrationRequest[] = [];
+      rSnap.forEach(d => {
+        rList.push({ id: d.id, ...d.data() } as RegistrationRequest);
+      });
+      latestReqs = rList;
+      processAndMergeData(latestUsers, latestReqs);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Registration request onSnapshot error:", err);
+      setFetchError(err.message || 'নিবন্ধন রিকোয়েস্ট লোড ব্যর্থ');
+      setLoading(false);
+    });
+
+    return () => {
+      unsubUsers();
+      unsubReqs();
+    };
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const userSnap = await getDocs(collection(db, 'users'));
+      const uList: UserProfile[] = [];
+      userSnap.forEach(d => uList.push({ uid: d.id, ...d.data() } as UserProfile));
+      uList.sort((a, b) => (b.createdAt || '') > (a.createdAt || '') ? 1 : -1);
+      setUsersList(uList);
+
+      const reqSnap = await getDocs(collection(db, 'registration_requests'));
+      const rList: RegistrationRequest[] = [];
+      reqSnap.forEach(d => rList.push({ id: d.id, ...d.data() } as RegistrationRequest));
+
+      processAndMergeData(uList, rList);
+    } catch (err: any) {
+      console.error("Could not load registration requests:", err);
+      setFetchError(err.message || 'অনুরোধ তালিকা লোড করতে সমস্যা হয়েছে');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Controlled Repair Execution (Triggered only by Admin action)
+  const handleExecuteRepair = async (targetUser?: UserProfile) => {
+    const listToRepair = targetUser ? [targetUser] : repairCandidates;
+    if (listToRepair.length === 0) return;
+
+    setRepairing(true);
+    setRepairSuccessMsg(null);
+    try {
+      for (const u of listToRepair) {
+        const now = new Date().toISOString();
+        const fallbackMethod = u.registrationMethod || (u.email?.includes('@gmail.com') ? 'google' : (u.phoneNumber ? 'phone' : 'email'));
+        const regReq: RegistrationRequest = {
+          id: u.uid,
+          uid: u.uid,
+          displayName: u.displayName || 'ইউজার',
+          email: u.email || undefined,
+          phoneNumber: u.phoneNumber || undefined,
+          photoURL: u.photoURL || undefined,
+          registrationMethod: fallbackMethod,
+          registrationDate: u.createdAt || now,
+          status: 'pending',
+          createdAt: u.createdAt || now
+        };
+        await setDoc(doc(db, 'registration_requests', u.uid), regReq, { merge: true });
+
+        // Add targeted notification for approvers
+        try {
+          await addDoc(collection(db, 'notifications'), {
+            title: `নতুন ইউজার নিবন্ধন আবেদন (${fallbackMethod.toUpperCase()})`,
+            message: `${u.displayName} (${u.email || u.phoneNumber || 'অ্যাকাউন্ট'}) সিস্টেম ব্যবহারের অনুমোদনের জন্য অপেক্ষমাণ।`,
+            type: 'approval_request',
+            linkPage: 'userApprovals',
+            applicantUid: u.uid,
+            applicantName: u.displayName,
+            registrationMethod: fallbackMethod,
+            targetRole: ['admin', 'principal'],
+            read: false,
+            createdAt: now
+          });
+        } catch (nErr) {
+          console.warn("Notification error during repair:", nErr);
+        }
+
+        // Audit log
+        await logAudit({
+          action: 'Pending Registration Request Repaired',
+          module: 'User Approvals & Access Control',
+          recordId: u.uid,
+          recordType: 'RegistrationRequest',
+          performedBy: currentUser?.displayName || 'Admin',
+          performedByRole: role || 'admin',
+          performedByUid: currentUser?.uid,
+          details: `নিবন্ধিত অপেক্ষমাণ অ্যাকাউন্ট (${u.displayName}, ${u.email || u.phoneNumber}) মেরামত ও সিঙ্ক করা হয়েছে।`
+        });
+      }
+
+      setRepairSuccessMsg(isBn ? 'অপেক্ষমাণ অ্যাকাউন্টের রিকোয়েস্ট সফলভাবে মেরামত ও ডাটাবেজে সংরক্ষণ করা হয়েছে।' : 'Missing registration requests repaired successfully.');
+      await loadData();
+    } catch (err: any) {
+      alert((isBn ? 'মেরামত করতে সমস্যা: ' : 'Repair error: ') + err.message);
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   const openReviewModal = (user: UserProfile | RegistrationRequest) => {
     setSelectedUser(user);
@@ -245,6 +411,8 @@ export const UserApprovalsPage: React.FC = () => {
       const userDocRef = doc(db, 'users', uid);
       await updateDoc(userDocRef, {
         status: 'active',
+        accountStatus: 'active',
+        approvalStatus: 'approved',
         role: assignedRole,
         permissions: permissions,
         approvedBy: currentUser?.uid || 'Admin',
@@ -257,6 +425,8 @@ export const UserApprovalsPage: React.FC = () => {
       const reqDocRef = doc(db, 'registration_requests', uid);
       await updateDoc(reqDocRef, {
         status: 'approved',
+        accountStatus: 'active',
+        approvalStatus: 'approved',
         assignedRole: assignedRole,
         assignedPermissions: permissions,
         reviewedBy: currentUser?.uid || 'Admin',
@@ -277,6 +447,20 @@ export const UserApprovalsPage: React.FC = () => {
         performedByUid: currentUser?.uid,
         details: `ইউজার ${selectedUser.displayName} (${selectedUser.email || selectedUser.phoneNumber || ''}) অনুমোদিত হয়েছে। নির্ধারিত রোল: ${assignedRole}`
       });
+
+      // 4. Notify Applicant of Approval
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          title: 'আপনার অ্যাকাউন্ট অনুমোদিত হয়েছে!',
+          message: `মুবারকবাদ! মাদরাসা কর্তৃপক্ষ আপনার নিবন্ধন অনুমোদন করেছেন। নির্ধারিত রোল: ${assignedRole.toUpperCase()}`,
+          type: 'approval_result',
+          targetUid: uid,
+          read: false,
+          createdAt: now
+        });
+      } catch (nErr) {
+        console.warn("Could not send applicant notification:", nErr);
+      }
 
       setActionSuccess(isBn ? 'ইউজার সফলভাবে অনুমোদিত ও সক্রিয় করা হয়েছে।' : 'User approved and activated successfully.');
       setTimeout(() => {
@@ -301,6 +485,8 @@ export const UserApprovalsPage: React.FC = () => {
       const userDocRef = doc(db, 'users', uid);
       await updateDoc(userDocRef, {
         status: 'rejected',
+        accountStatus: 'rejected',
+        approvalStatus: 'rejected',
         rejectionReason: rejectionReason.trim() || 'কর্তৃপক্ষ কর্তৃক আবেদনটি গৃহীত হয়নি',
         updatedAt: now
       });
@@ -309,6 +495,8 @@ export const UserApprovalsPage: React.FC = () => {
       const reqDocRef = doc(db, 'registration_requests', uid);
       await updateDoc(reqDocRef, {
         status: 'rejected',
+        accountStatus: 'rejected',
+        approvalStatus: 'rejected',
         rejectionReason: rejectionReason.trim(),
         reviewedBy: currentUser?.uid,
         reviewedByName: currentUser?.displayName || 'Authorized Approver',
@@ -327,6 +515,20 @@ export const UserApprovalsPage: React.FC = () => {
         reason: rejectionReason,
         details: `ইউজার ${selectedUser.displayName}-এর আবেদন প্রত্যাখ্যান করা হয়েছে। কারণ: ${rejectionReason}`
       });
+
+      // 4. Notify Applicant of Rejection
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          title: 'নিবন্ধন আবেদন সংক্রান্ত নোটিশ',
+          message: `আপনার অ্যাকাউন্ট আবেদনটি কর্তৃপক্ষ কর্তৃক গৃহীত হয়নি। কারণ: ${rejectionReason.trim() || 'কর্তৃপক্ষের সিদ্ধান্ত'}`,
+          type: 'approval_result',
+          targetUid: uid,
+          read: false,
+          createdAt: now
+        });
+      } catch (nErr) {
+        console.warn("Could not send applicant notification:", nErr);
+      }
 
       setActionSuccess(isBn ? 'আবেদনটি প্রত্যাখ্যান করা হয়েছে।' : 'Registration rejected.');
       setTimeout(() => {
@@ -354,8 +556,108 @@ export const UserApprovalsPage: React.FC = () => {
     }
   };
 
-  const pendingRequests = requests.filter(r => r.status === 'pending');
-  const filteredUsers = usersList.filter(u => 
+  const handleToggleUserStatus = async (user: UserProfile) => {
+    const isUAdmin = user.uid === 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3' || user.email?.toLowerCase() === 'tamimnur908@gmail.com';
+    if (isUAdmin) {
+      alert(isBn ? 'প্রধান প্রশাসকের অ্যাকাউন্ট নিষ্ক্রিয় করা যাবে না।' : 'Cannot disable Super Admin account.');
+      return;
+    }
+    const isCurrentlyActive = user.status === 'active' || user.accountStatus === 'active';
+    const willDisable = isCurrentlyActive;
+    const confirmMsg = willDisable
+      ? (isBn ? `${user.displayName}-এর অ্যাকাউন্ট সাময়িকভাবে নিষ্ক্রিয় (Disable) করতে চান? ইউজার সিস্টেম ব্যবহার করতে পারবেন না।` : `Disable account for ${user.displayName}? User will lose access to the system.`)
+      : (isBn ? `${user.displayName}-এর অ্যাকাউন্ট পুনরায় সক্রিয় (Enable) করতে চান?` : `Re-enable account for ${user.displayName}?`);
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const newStatus: UserStatus = willDisable ? 'disabled' : 'active';
+      const now = new Date().toISOString();
+      await updateDoc(doc(db, 'users', user.uid), {
+        status: newStatus,
+        accountStatus: newStatus,
+        updatedAt: now
+      });
+
+      await logAudit({
+        action: willDisable ? 'User Account Disabled' : 'User Account Enabled',
+        module: 'User Approvals & Access Control',
+        recordId: user.uid,
+        recordType: 'UserProfile',
+        performedBy: currentUser?.displayName || 'Admin',
+        performedByRole: role || 'admin',
+        performedByUid: currentUser?.uid,
+        details: `ইউজার ${user.displayName} (${user.email || user.phoneNumber || ''}) এর স্ট্যাটাস '${newStatus}'-এ পরিবর্তন করা হয়েছে।`
+      });
+
+      await loadData();
+    } catch (err: any) {
+      alert((isBn ? 'স্ট্যাটাস পরিবর্তনে সমস্যা: ' : 'Status update error: ') + err.message);
+    }
+  };
+
+  const handleRevokeAccess = async (user: UserProfile) => {
+    const isUAdmin = user.uid === 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3' || user.email?.toLowerCase() === 'tamimnur908@gmail.com';
+    if (isUAdmin) {
+      alert(isBn ? 'প্রধান প্রশাসকের এক্সেস প্রত্যাহার করা যাবে না।' : 'Cannot revoke Super Admin access.');
+      return;
+    }
+    const confirmMsg = isBn 
+      ? `সতর্কতা: ${user.displayName}-এর সমস্ত মডিউল পারমিশন প্রত্যাহার (Revoke) করে অ্যাকাউন্ট নিষ্ক্রিয় করতে চান?` 
+      : `Warning: Revoke all module permissions and disable access for ${user.displayName}?`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const now = new Date().toISOString();
+      await updateDoc(doc(db, 'users', user.uid), {
+        status: 'disabled',
+        accountStatus: 'disabled',
+        permissions: {},
+        updatedAt: now
+      });
+
+      await logAudit({
+        action: 'User Access Revoked',
+        module: 'User Approvals & Access Control',
+        recordId: user.uid,
+        recordType: 'UserProfile',
+        performedBy: currentUser?.displayName || 'Admin',
+        performedByRole: role || 'admin',
+        performedByUid: currentUser?.uid,
+        details: `ইউজার ${user.displayName}-এর সমস্ত পারমিশন প্রত্যাহার এবং অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে।`
+      });
+
+      await loadData();
+    } catch (err: any) {
+      alert((isBn ? 'এক্সেস প্রত্যাহারে সমস্যা: ' : 'Revoke error: ') + err.message);
+    }
+  };
+
+  // Tab 1: ONLY pending applications
+  const pendingRequests = requests.filter(r => 
+    (isPendingStatus(r.status) || isPendingStatus(r.accountStatus) || r.approvalStatus === 'pending') &&
+    r.status !== 'approved' &&
+    r.status !== 'rejected' &&
+    r.approvalStatus !== 'approved' &&
+    r.approvalStatus !== 'rejected'
+  );
+
+  // Tab 2: ONLY approved users. Pending and rejected users must NEVER appear.
+  const approvedUsers = usersList.filter(u => {
+    // Exclude if pending
+    if (isPendingStatus(u.status) || isPendingStatus(u.accountStatus) || u.approvalStatus === 'pending') {
+      return false;
+    }
+    // Exclude if rejected
+    if (u.status === 'rejected' || u.accountStatus === 'rejected' || u.approvalStatus === 'rejected') {
+      return false;
+    }
+    // Must be active or disabled (or approvalStatus === 'approved')
+    return u.status === 'active' || u.status === 'disabled' || u.accountStatus === 'active' || u.accountStatus === 'disabled' || u.approvalStatus === 'approved';
+  });
+
+  const filteredApprovedUsers = approvedUsers.filter(u => 
     (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.phoneNumber || '').includes(searchTerm)
@@ -423,6 +725,76 @@ export const UserApprovalsPage: React.FC = () => {
       {/* ============================================================== */}
       {activeTab === 'pending' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* CONTROLLED REPAIR PREVIEW (Requirement 6) */}
+          {repairCandidates.length > 0 && (
+            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-200 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center space-x-2">
+                  <Wrench className="w-5 h-5 text-amber-600 shrink-0" />
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-amber-950">
+                      {isBn ? `মেরামত প্রিভিউ: ${repairCandidates.length} টি অপেক্ষমাণ অ্যাকাউন্টের রিকোয়েস্ট সিঙ্ক করা প্রয়োজন` : `Repair Preview: ${repairCandidates.length} Pending Account(s) Missing Approval Request`}
+                    </h4>
+                    <p className="text-[11px] text-amber-800">
+                      {isBn ? 'এই অ্যাকাউন্টগুলো পূর্বে নিবন্ধিত হয়ে পেন্ডিং অবস্থায় আছে কিন্তু রিকোয়েস্ট ডকুমেন্টে যুক্ত ছিল না। নিচে বিস্তারিত যাচাই করে নিশ্চিত করুন।' : 'These accounts are registered as pending in users collection. Review below and approve repair.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleExecuteRepair()}
+                  disabled={repairing}
+                  className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1.5 shrink-0 disabled:opacity-50 shadow-xs"
+                >
+                  {repairing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                  <span>{isBn ? "সকল মেরামত অনুমোদন ও সম্পন্ন করুন" : "Approve & Execute Repair"}</span>
+                </button>
+              </div>
+
+              {repairSuccessMsg && (
+                <div className="p-2.5 bg-emerald-100 border border-emerald-300 text-emerald-900 rounded-lg text-xs font-semibold flex items-center space-x-2 animate-fadeIn">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{repairSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Repair Candidate List Table */}
+              <div className="overflow-x-auto bg-white/90 rounded-xl border border-amber-200">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-amber-100/70 text-amber-900 font-bold">
+                    <tr>
+                      <th className="py-2 px-3">{isBn ? "আবেদনকারী" : "Applicant"}</th>
+                      <th className="py-2 px-3">{isBn ? "যোগাযোগ" : "Contact"}</th>
+                      <th className="py-2 px-3">{isBn ? "নিবন্ধন তারিখ" : "Date"}</th>
+                      <th className="py-2 px-3 font-mono">UID</th>
+                      <th className="py-2 px-3 text-right">{isBn ? "অ্যাকশন" : "Action"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {repairCandidates.map((c) => (
+                      <tr key={c.uid} className="hover:bg-amber-50/50">
+                        <td className="py-2 px-3 font-bold text-slate-900">{c.displayName}</td>
+                        <td className="py-2 px-3 text-slate-600">{c.email || c.phoneNumber || '-'}</td>
+                        <td className="py-2 px-3 text-slate-500">{c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}</td>
+                        <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{c.uid}</td>
+                        <td className="py-2 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleExecuteRepair(c)}
+                            disabled={repairing}
+                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-[11px] font-bold"
+                          >
+                            {isBn ? "মেরামত করুন" : "Repair"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
@@ -430,14 +802,42 @@ export const UserApprovalsPage: React.FC = () => {
                 {isBn ? "অনুমোদনের অপেক্ষায় থাকা নতুন আবেদনসমূহ" : "Pending User Registrations Awaiting Approval"}
               </h3>
             </div>
-            <span className="text-xs text-slate-500">
-              {isBn ? `মোট : ${pendingRequests.length} টি আবেদন` : `Total: ${pendingRequests.length} requests`}
-            </span>
+            <div className="flex items-center space-x-3">
+              <span className="text-xs text-slate-500 font-semibold">
+                {isBn ? `মোট : ${pendingRequests.length} টি আবেদন` : `Total: ${pendingRequests.length} requests`}
+              </span>
+              <button
+                type="button"
+                onClick={loadData}
+                disabled={loading}
+                title={isBn ? "রিফ্রেশ" : "Refresh"}
+                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-lg border border-slate-200 transition disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+              </button>
+            </div>
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-slate-400 text-xs">
-              {isBn ? "তথ্য লোড হচ্ছে..." : "Loading requests..."}
+            <div className="p-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center space-y-2">
+              <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+              <span>{isBn ? "তথ্য লোড ও আবেদন যাচাই হচ্ছে..." : "Loading requests and verifying applicants..."}</span>
+            </div>
+          ) : fetchError ? (
+            <div className="p-8 text-center space-y-3 bg-red-50/50 border-b border-red-100">
+              <AlertCircle className="w-8 h-8 text-red-500 mx-auto" />
+              <p className="text-sm font-bold text-red-800">
+                {isBn ? "আবেদন তালিকা লোড করতে সমস্যা হয়েছে" : "Failed to load approval requests"}
+              </p>
+              <p className="text-xs text-red-600 max-w-md mx-auto">{fetchError}</p>
+              <button
+                type="button"
+                onClick={loadData}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center space-x-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{isBn ? "পুনরায় চেষ্টা করুন" : "Retry"}</span>
+              </button>
             </div>
           ) : pendingRequests.length === 0 ? (
             <div className="p-12 text-center space-y-2">
@@ -516,94 +916,163 @@ export const UserApprovalsPage: React.FC = () => {
       {/* ============================================================== */}
       {activeTab === 'users' && (
         <div className="space-y-4">
-          {/* Search Bar */}
-          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder={isBn ? "নাম, ইমেইল বা মোবাইল নম্বর দিয়ে ব্যবহারকারী খুঁজুন..." : "Search users by name, email, or phone..."}
-              className="w-full text-xs sm:text-sm focus:outline-none"
-            />
+          {/* Search Bar & Summary */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-3 flex-1">
+              <Search className="w-4 h-4 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={isBn ? "অনুমোদিত ইউজার খুঁজুন (নাম, ইমেইল বা ফোন নম্বর)..." : "Search approved users by name, email, or phone..."}
+                className="w-full text-xs sm:text-sm focus:outline-none"
+              />
+            </div>
+            <div className="text-xs text-slate-500 font-semibold px-2 shrink-0">
+              {isBn ? `অনুমোদিত ইউজার : ${filteredApprovedUsers.length} জন` : `Approved Users: ${filteredApprovedUsers.length}`}
+            </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">{isBn ? "ব্যবহারকারী" : "User"}</th>
-                    <th className="py-3 px-4">{isBn ? "যোগাযোগ" : "Contact"}</th>
-                    <th className="py-3 px-4">{isBn ? "রোল" : "Role"}</th>
-                    <th className="py-3 px-4">{isBn ? "স্ট্যাটাস" : "Status"}</th>
-                    <th className="py-3 px-4">{isBn ? "অনুমোদনকারী" : "Approved By"}</th>
-                    <th className="py-3 px-4 text-right">{isBn ? "অ্যাকশন" : "Action"}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.map((u) => {
-                    const isUAdmin = u.role === 'admin' || u.uid === 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3';
-                    return (
-                      <tr key={u.uid} className="hover:bg-slate-50/70 transition">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-800 font-bold flex items-center justify-center shrink-0">
-                              {u.displayName?.charAt(0) || 'U'}
+            {filteredApprovedUsers.length === 0 ? (
+              <div className="p-12 text-center space-y-2">
+                <Users className="w-10 h-10 text-slate-300 mx-auto" />
+                <p className="text-sm font-bold text-slate-700">
+                  {isBn ? "কোনো অনুমোদিত ইউজার পাওয়া যায়নি" : "No approved users found"}
+                </p>
+                <p className="text-xs text-slate-400">
+                  {isBn ? "নতুন আবেদন অনুমোদন পেলে এখানে প্রদর্শিত হবে।" : "Users will appear here once approved by an administrator."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">{isBn ? "ব্যবহারকারী" : "User"}</th>
+                      <th className="py-3 px-4">{isBn ? "যোগাযোগ" : "Contact"}</th>
+                      <th className="py-3 px-4">{isBn ? "নির্ধারিত রোল" : "Assigned Role"}</th>
+                      <th className="py-3 px-4">{isBn ? "পারমিশন এক্সেস" : "Permissions"}</th>
+                      <th className="py-3 px-4">{isBn ? "স্ট্যাটাস" : "Status"}</th>
+                      <th className="py-3 px-4">{isBn ? "অনুমোদন ও তারিখ" : "Approved By & Date"}</th>
+                      <th className="py-3 px-4 text-right">{isBn ? "অ্যাকশন" : "Actions"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredApprovedUsers.map((u) => {
+                      const isUAdmin = u.role === 'admin' || u.uid === 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3' || u.email?.toLowerCase() === 'tamimnur908@gmail.com';
+                      const isActive = u.status === 'active' || u.accountStatus === 'active';
+                      const activeModuleCount = Object.keys(u.permissions || {}).filter(m => (u.permissions as any)[m]?.length > 0).length;
+
+                      return (
+                        <tr key={u.uid} className={`transition ${!isActive ? 'bg-slate-50/60 opacity-80' : 'hover:bg-slate-50/70'}`}>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center space-x-2.5">
+                              <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 font-bold flex items-center justify-center shrink-0">
+                                {u.displayName?.charAt(0) || 'U'}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900">{u.displayName}</div>
+                                {isUAdmin ? (
+                                  <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
+                                    {isBn ? "প্রধান প্রশাসক" : "Super Admin"}
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-[10px] text-slate-400 block truncate max-w-[120px]">
+                                    {u.uid}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-bold text-slate-900">{u.displayName}</div>
-                              {isUAdmin && (
-                                <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
-                                  {isBn ? "প্রধান প্রশাসক" : "Super Admin"}
-                                </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-600 space-y-0.5">
+                            {u.email && <div className="text-slate-800">{u.email}</div>}
+                            {u.phoneNumber && <div className="font-mono text-slate-700 font-semibold">{u.phoneNumber}</div>}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
+                              u.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                              u.role === 'principal' ? 'bg-blue-100 text-blue-800' :
+                              u.role === 'accountant' ? 'bg-emerald-100 text-emerald-800' :
+                              u.role === 'teacher' ? 'bg-amber-100 text-amber-800' :
+                              'bg-slate-100 text-slate-700'
+                            }`}>
+                              {u.role ? u.role.toUpperCase() : 'STAFF'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => openReviewModal(u)}
+                              className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition"
+                            >
+                              {activeModuleCount > 0 
+                                ? (isBn ? `${activeModuleCount} টি মডিউল সক্রিয়` : `${activeModuleCount} Modules`)
+                                : (isBn ? "কোনো পারমিশন নেই" : "No Permissions")}
+                            </button>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center space-x-1 ${
+                              isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-500'}`}></span>
+                              <span>{isActive ? (isBn ? "সক্রিয়" : "ACTIVE") : (isBn ? "নিষ্ক্রিয়" : "DISABLED")}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-slate-500 text-[11px] space-y-0.5">
+                            <div className="font-medium text-slate-700">{u.approvedByName || (isUAdmin ? 'System Owner' : '—')}</div>
+                            <div className="text-[10px] text-slate-400">
+                              {u.approvedAt ? new Date(u.approvedAt).toLocaleDateString() : (u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '')}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end space-x-1.5">
+                              {/* Edit Permissions / Role */}
+                              <button
+                                type="button"
+                                onClick={() => openReviewModal(u)}
+                                title={isBn ? "রোল ও পারমিশন পরিবর্তন" : "Edit Role & Permissions"}
+                                className="p-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg transition"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Toggle Enable / Disable */}
+                              {!isUAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleUserStatus(u)}
+                                  title={isActive ? (isBn ? "অ্যাকাউন্ট নিষ্ক্রিয় করুন" : "Disable Account") : (isBn ? "অ্যাকাউন্ট সক্রিয় করুন" : "Enable Account")}
+                                  className={`p-1.5 rounded-lg border transition ${
+                                    isActive
+                                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                  }`}
+                                >
+                                  {isActive ? <Ban className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                                </button>
+                              )}
+
+                              {/* Revoke Access */}
+                              {!isUAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRevokeAccess(u)}
+                                  title={isBn ? "এক্সেস প্রত্যাহার ও নিষ্ক্রিয়" : "Revoke Access"}
+                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg transition"
+                                >
+                                  <Slash className="w-3.5 h-3.5" />
+                                </button>
                               )}
                             </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-slate-600 space-y-0.5">
-                          {u.email && <div>{u.email}</div>}
-                          {u.phoneNumber && <div className="font-mono text-slate-700 font-semibold">{u.phoneNumber}</div>}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                            u.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                            u.role === 'principal' ? 'bg-blue-100 text-blue-800' :
-                            u.role === 'accountant' ? 'bg-emerald-100 text-emerald-800' :
-                            u.role === 'teacher' ? 'bg-amber-100 text-amber-800' :
-                            'bg-slate-100 text-slate-700'
-                          }`}>
-                            {u.role ? u.role.toUpperCase() : 'STAFF'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            u.status === 'active' ? 'bg-emerald-100 text-emerald-800' :
-                            u.status === 'pending' ? 'bg-amber-100 text-amber-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {u.status ? u.status.toUpperCase() : 'ACTIVE'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 text-[11px]">
-                          {u.approvedByName || (isUAdmin ? 'System Owner' : '—')}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => openReviewModal(u)}
-                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg text-xs font-semibold transition inline-flex items-center space-x-1"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                            <span>{isBn ? "পারমিশন এডিট" : "Edit Permissions"}</span>
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

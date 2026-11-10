@@ -232,12 +232,9 @@ export const translations = {
     backToLogin: "লগইনে ফিরুন",
 
     // Pending Approval & Registration Messages
-    regSuccessTitle: "নিবন্ধন সফল হয়েছে",
-    regSuccessMsg1: "আপনার অ্যাকাউন্টটি সফলভাবে নিবন্ধিত হয়েছে। বর্তমানে আপনার অ্যাকাউন্টটি অনুমোদনের অপেক্ষায় রয়েছে।",
-    regSuccessMsg2: "মাদরাসার অধ্যক্ষ/অনুমোদিত প্রশাসকের অনুমতি না পাওয়া পর্যন্ত আপনি ERP সিস্টেমের কোনো কার্যক্রম ব্যবহার করতে পারবেন না।",
-    regSuccessMsg3: "আপনার অ্যাকাউন্ট অনুমোদিত হলে আপনি নির্ধারিত Role ও Permission অনুযায়ী সিস্টেম ব্যবহার করতে পারবেন।",
-    regSuccessMsg4: "অনুগ্রহ করে অনুমোদনের জন্য অপেক্ষা করুন।",
-    regStatusPending: "অ্যাকাউন্ট অনুমোদনের অপেক্ষমাণ",
+    regSuccessTitle: "নিবন্ধন সফল হয়েছে!",
+    regSuccessMessage: "আপনার অ্যাকাউন্টটি সফলভাবে নিবন্ধিত হয়েছে। অনুগ্রহপূর্বক মাদরাসার অধ্যক্ষ অথবা অনুমোদিত Admin-এর অনুমোদনের জন্য অপেক্ষা করুন।",
+    regStatusPending: "অনুমোদনের অপেক্ষায়",
     regStatusRejected: "অ্যাকাউন্ট প্রত্যাখ্যান করা হয়েছে",
     regRejectedMsg: "দুঃখিত, আপনার নিবন্ধন আবেদনটি অনুমোদিত হয়নি। বিস্তারিত জানার জন্য মাদরাসা কর্তৃপক্ষের সাথে যোগাযোগ করুন।",
     refreshStatus: "স্ট্যাটাস রিফ্রেশ করুন",
@@ -503,12 +500,9 @@ export const translations = {
     backToLogin: "Back to Login",
 
     // Pending Approval & Registration Messages
-    regSuccessTitle: "Registration Successful",
-    regSuccessMsg1: "Your account has been successfully registered and is currently pending approval.",
-    regSuccessMsg2: "You cannot access or use any ERP features until your account is approved by the Madrasa Principal or an authorized administrator.",
-    regSuccessMsg3: "Once your account is approved, you will be able to use the system according to your assigned role and permissions.",
-    regSuccessMsg4: "Please wait for approval.",
-    regStatusPending: "Account Pending Approval",
+    regSuccessTitle: "Registration Successful!",
+    regSuccessMessage: "Your account has been successfully registered. Please wait for approval from the Madrasa Principal or an authorized Admin.",
+    regStatusPending: "Pending Approval",
     regStatusRejected: "Account Registration Rejected",
     regRejectedMsg: "Sorry, your registration request has not been approved. Please contact the madrasa administration.",
     refreshStatus: "Refresh Status",

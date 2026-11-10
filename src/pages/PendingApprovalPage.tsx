@@ -6,7 +6,6 @@ import {
   ShieldAlert, 
   LogOut, 
   RefreshCw, 
-  UserCheck, 
   AlertOctagon, 
   Mail, 
   Phone, 
@@ -23,14 +22,15 @@ export const PendingApprovalPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
-  const isRejected = userProfile?.status === 'rejected';
+  const isRejected = userProfile?.status === 'rejected' || userProfile?.approvalStatus === 'rejected';
+  const isDisabled = userProfile?.status === 'disabled' || userProfile?.accountStatus === 'disabled';
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setFeedbackMsg(null);
     try {
       await refreshUserProfile();
-      setFeedbackMsg(isBn ? 'স্ট্যাটাস আপডেট যাচাই করা হয়েছে।' : 'Status checked.');
+      setFeedbackMsg(isBn ? 'স্ট্যাটাস যাচাই করা হয়েছে।' : 'Status verified.');
     } catch (err: any) {
       console.warn("Refresh error:", err);
     } finally {
@@ -93,6 +93,10 @@ export const PendingApprovalPage: React.FC = () => {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-100 text-red-600 mb-4 shadow-inner">
                 <AlertOctagon className="w-9 h-9" />
               </div>
+            ) : isDisabled ? (
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-200 text-slate-700 mb-4 shadow-inner">
+                <ShieldAlert className="w-9 h-9" />
+              </div>
             ) : (
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 mb-4 shadow-inner animate-pulse">
                 <Clock className="w-9 h-9" />
@@ -102,20 +106,27 @@ export const PendingApprovalPage: React.FC = () => {
             <h2 className="text-xl sm:text-2xl font-black text-slate-900">
               {isRejected 
                 ? (isBn ? "নিবন্ধন আবেদন প্রত্যাখ্যাত" : "Registration Rejected")
-                : (isBn ? "নিবন্ধন সফল হয়েছে" : "Registration Successful")
+                : isDisabled
+                ? (isBn ? "অ্যাকাউন্ট নিষ্ক্রিয় করা হয়েছে" : "Account Disabled")
+                : (isBn ? "নিবন্ধন সফল হয়েছে!" : "Registration Successful!")
               }
             </h2>
 
-            <div className="mt-2 inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-bold border">
+            <div className="mt-2.5 inline-flex items-center space-x-1.5 px-3.5 py-1 rounded-full text-xs font-bold border">
               {isRejected ? (
                 <span className="bg-red-50 text-red-700 border-red-200 flex items-center space-x-1">
                   <ShieldAlert className="w-3.5 h-3.5 mr-1" />
-                  <span>{isBn ? "প্রত্যাখ্যাত (Rejected)" : "Status: Rejected"}</span>
+                  <span>{isBn ? "প্রত্যাখ্যাত" : "Rejected"}</span>
+                </span>
+              ) : isDisabled ? (
+                <span className="bg-slate-100 text-slate-700 border-slate-300 flex items-center space-x-1">
+                  <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+                  <span>{isBn ? "নিষ্ক্রিয় (Disabled)" : "Disabled"}</span>
                 </span>
               ) : (
                 <span className="bg-amber-50 text-amber-800 border-amber-200 flex items-center space-x-1">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping mr-1"></span>
-                  <span>{isBn ? "অনুমোদনের অপেক্ষায় (Pending Approval)" : "Status: Pending Approval"}</span>
+                  <span>{isBn ? "অনুমোদনের অপেক্ষায়" : "Pending Approval"}</span>
                 </span>
               )}
             </div>
@@ -159,8 +170,8 @@ export const PendingApprovalPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Official Mandated Message */}
-          <div className="space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed bg-amber-50/60 p-4 rounded-2xl border border-amber-200/70 mb-6">
+          {/* Exact Mandated Pending / Rejection Message */}
+          <div className="space-y-3 text-xs sm:text-sm text-slate-700 leading-relaxed bg-amber-50/70 p-4 sm:p-5 rounded-2xl border border-amber-200 mb-6 shadow-xs">
             {isRejected ? (
               <div className="text-red-800 space-y-2">
                 <p className="font-bold">
@@ -176,42 +187,29 @@ export const PendingApprovalPage: React.FC = () => {
                 )}
                 <p className="text-xs text-slate-600">
                   {isBn 
-                    ? "বিস্তারিত তথ্যের জন্য সরাসরি মাদরাসার প্রধান প্রশাসকের সাথে যোগাযোগ করুন।"
-                    : "Please contact the Madrasa Principal or Super Admin for further assistance."}
+                    ? "বিস্তারিত তথ্যের জন্য সরাসরি মাদরাসার অধ্যক্ষ অথবা অনুমোদিত Admin-এর সাথে যোগাযোগ করুন।"
+                    : "Please contact the Madrasa Principal or an authorized Admin for further details."}
+                </p>
+              </div>
+            ) : isDisabled ? (
+              <div className="text-slate-800 space-y-2">
+                <p className="font-bold text-slate-900">
+                  {isBn 
+                    ? "আপনার অ্যাকাউন্টটি সাময়িকভাবে নিষ্ক্রিয় (Disabled) করা হয়েছে।" 
+                    : "Your account has been temporarily disabled."}
+                </p>
+                <p className="text-xs text-slate-600">
+                  {isBn 
+                    ? "অ্যাকাউন্ট পুনরায় চালু করার জন্য মাদরাসা কর্তৃপক্ষের সাথে যোগাযোগ করুন।"
+                    : "Please contact the Madrasa Administration to re-enable your account."}
                 </p>
               </div>
             ) : (
-              isBn ? (
-                <>
-                  <p className="font-semibold text-slate-900">
-                    আপনার অ্যাকাউন্টটি সফলভাবে নিবন্ধিত হয়েছে। বর্তমানে আপনার অ্যাকাউন্টটি অনুমোদনের অপেক্ষায় রয়েছে।
-                  </p>
-                  <p className="text-slate-700">
-                    মাদরাসার অধ্যক্ষ/অনুমোদিত প্রশাসকের অনুমতি না পাওয়া পর্যন্ত আপনি ERP সিস্টেমের কোনো কার্যক্রম ব্যবহার করতে পারবেন না।
-                  </p>
-                  <p className="text-slate-700">
-                    আপনার অ্যাকাউন্ট অনুমোদিত হলে আপনি নির্ধারিত Role ও Permission অনুযায়ী সিস্টেম ব্যবহার করতে পারবেন।
-                  </p>
-                  <p className="font-bold text-amber-900 pt-1 border-t border-amber-200/80">
-                    অনুগ্রহ করে অনুমোদনের জন্য অপেক্ষা করুন।
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-semibold text-slate-900">
-                    Your account has been successfully registered and is currently pending approval.
-                  </p>
-                  <p className="text-slate-700">
-                    You cannot access or use any ERP features until your account is approved by the Madrasa Principal or an authorized administrator.
-                  </p>
-                  <p className="text-slate-700">
-                    Once your account is approved, you will be able to use the system according to your assigned role and permissions.
-                  </p>
-                  <p className="font-bold text-amber-900 pt-1 border-t border-amber-200/80">
-                    Please wait for approval.
-                  </p>
-                </>
-              )
+              <p className="font-semibold text-slate-900 leading-relaxed text-center sm:text-left">
+                {isBn 
+                  ? "আপনার অ্যাকাউন্টটি সফলভাবে নিবন্ধিত হয়েছে। অনুগ্রহপূর্বক মাদরাসার অধ্যক্ষ অথবা অনুমোদিত Admin-এর অনুমোদনের জন্য অপেক্ষা করুন।"
+                  : "Your account has been successfully registered. Please wait for approval from the Madrasa Principal or an authorized Admin."}
+              </p>
             )}
           </div>
 
