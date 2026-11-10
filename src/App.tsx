@@ -5,7 +5,9 @@ import { SettingsProvider } from './context/SettingsContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { LoginPage } from './pages/LoginPage';
-import { Loader2 } from 'lucide-react';
+import { PendingApprovalPage } from './pages/PendingApprovalPage';
+import { UserApprovalsPage } from './pages/UserApprovalsPage';
+import { Loader2, ShieldAlert } from 'lucide-react';
 
 // All 16 Sidebar Modules
 import { DashboardPage } from './pages/DashboardPage';
@@ -24,11 +26,32 @@ import { NoticeBoardPage } from './pages/NoticeBoardPage';
 import { CentralReportsPage } from './pages/CentralReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BackupRestorePage } from './pages/BackupRestorePage';
+import { ERPModule } from './types';
+
+const PAGE_MODULE_MAP: Record<string, ERPModule> = {
+  dashboard: 'dashboard',
+  teacherAttendance: 'attendance',
+  teachers: 'teachers',
+  attendanceAudit: 'attendance',
+  students: 'students',
+  admissions: 'students',
+  studentAttendance: 'attendance',
+  feeManagement: 'fees',
+  teacherSalary: 'payroll',
+  accounts: 'accounts',
+  routines: 'academic',
+  exams: 'academic',
+  notices: 'notices',
+  reports: 'reports',
+  settings: 'settings',
+  backupRestore: 'backupRestore',
+  userApprovals: 'userApprovals',
+};
 
 const MainLayout: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
-  const { currentUser, loading } = useAuth();
+  const { currentUser, userProfile, isSuperAdmin, canApproveRegistrations, loading, hasPermission } = useAuth();
 
   if (loading) {
     return (
@@ -42,14 +65,47 @@ const MainLayout: React.FC = () => {
     );
   }
 
+  // Not logged in -> Show LoginPage
   if (!currentUser) {
     return <LoginPage />;
   }
 
+  // CRITICAL REQUIREMENT 3: Block access before approval!
+  // If user is pending or rejected and not Super Admin, show PendingApprovalPage
+  if (!isSuperAdmin && userProfile && (userProfile.status === 'pending' || userProfile.status === 'rejected')) {
+    return <PendingApprovalPage />;
+  }
+
+  // Check if current user has permission for the module
+  const targetModule = PAGE_MODULE_MAP[currentPage];
+  const isAuthorized = isSuperAdmin || (targetModule ? hasPermission(targetModule, 'view') : true);
+
   const renderContent = () => {
+    if (!isAuthorized && targetModule) {
+      return (
+        <div className="bg-white p-10 rounded-2xl border border-slate-200 text-center max-w-lg mx-auto my-12 space-y-4 shadow-sm font-bengali">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900">অ্যাক্সেস অনুমোদিত নয় (Access Restricted)</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            এই মডিউলটি দেখার জন্য আপনার অ্যাকাউন্টে পর্যাপ্ত অনুমতি (Permission) প্রদান করা হয়নি। বিস্তারিত তথ্যের জন্য মাদরাসা কর্তৃপক্ষের সাথে যোগাযোগ করুন।
+          </p>
+          <button
+            onClick={() => setCurrentPage('dashboard')}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+          >
+            ড্যাশবোর্ডে ফিরে যান
+          </button>
+        </div>
+      );
+    }
+
     switch (currentPage) {
       case 'dashboard':
         return <DashboardPage onNavigate={(p) => setCurrentPage(p)} />;
+      case 'userApprovals':
+        return <UserApprovalsPage />;
       case 'teacherAttendance':
         return <TeacherAttendancePage />;
       case 'teachers':

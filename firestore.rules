@@ -1,148 +1,273 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
+
+    // =========================================================================
+    // 1. GLOBAL HELPER FUNCTIONS & ROLE VERIFICATION
+    // =========================================================================
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isSuperAdmin() {
+
+    function isOwner() {
       return isAuthenticated() && (
-        request.auth.uid == "ymWfOe8MvbeLT2Pw1ILqDI4F8yH3" ||
-        (request.auth.token.email != null && request.auth.token.email == "tamimnur908@gmail.com") ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+        request.auth.uid == 'ymWfOe8MvbeLT2Pw1ILqDI4F8yH3' ||
+        (request.auth.token.email != null && request.auth.token.email.lower() == 'tamimnur908@gmail.com')
       );
     }
 
-    // User Profiles
+    function hasUserDoc() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isOwner() || (isAuthenticated() && hasUserDoc() && getUserData().role == 'admin');
+    }
+
+    function isPrincipal() {
+      return isSuperAdmin() || (isAuthenticated() && hasUserDoc() && getUserData().role == 'principal');
+    }
+
+    function isAccountant() {
+      return isSuperAdmin() || (isAuthenticated() && hasUserDoc() && getUserData().role == 'accountant');
+    }
+
+    function isTeacher() {
+      return isPrincipal() || (isAuthenticated() && hasUserDoc() && getUserData().role == 'teacher');
+    }
+
+    function isStaffMember() {
+      return isSuperAdmin() || (isAuthenticated() && hasUserDoc() && (
+        getUserData().role in ['admin', 'principal', 'teacher', 'accountant', 'staff']
+      ));
+    }
+
+    // Active user check: User must be approved to perform operations
+    function isActiveUser() {
+      return isSuperAdmin() || (
+        isAuthenticated() && hasUserDoc() && getUserData().status == 'active'
+      );
+    }
+
+    // =========================================================================
+    // 2. USERS COLLECTION (`users/{userId}`)
+    // =========================================================================
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow get: if isAuthenticated() && (request.auth.uid == userId || isPrincipal());
+      allow list: if isPrincipal();
+
+      // Profile creation:
+      // - Super Admin can create any profile
+      // - Ordinary user can create their own profile, but MUST have status == 'pending' and CANNOT set role == 'admin'
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() || (
+          request.auth.uid == userId &&
+          request.resource.data.status == 'pending' &&
+          request.resource.data.role != 'admin'
+        )
+      );
+
+      // Profile updates:
+      // - Super Admin & Authorized Principal can change role, status, permissions
+      // - Ordinary user can ONLY update their own personal display info (NOT role, status, or permissions)
+      allow update: if isSuperAdmin() || isPrincipal() || (
+        isAuthenticated() && request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'permissions', 'teacherId'])
+      );
+
+      allow delete: if isSuperAdmin();
     }
 
-    // Institution Settings
-    match /institution_settings/{settingId} {
+    // =========================================================================
+    // 3. REGISTRATION REQUESTS (`registration_requests/{requestId}`)
+    // =========================================================================
+    match /registration_requests/{requestId} {
+      allow read: if isPrincipal() || (isAuthenticated() && request.auth.uid == requestId);
+      allow create: if isAuthenticated() && (
+        isSuperAdmin() || (
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.status == 'pending'
+        )
+      );
+      allow update: if isPrincipal();
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================================
+    // 4. INSTITUTION SETTINGS (`institution_settings/{docId}`)
+    // =========================================================================
+    match /institution_settings/{docId} {
       allow read: if isAuthenticated();
       allow write: if isSuperAdmin();
     }
 
-    // Classes & Sections
-    match /madrasa_classes/{classId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
-    }
-    match /sections/{sectionId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
-    }
-
-    // Students: All authenticated staff can add; only Super Admin can edit or delete
+    // =========================================================================
+    // 5. STUDENTS COLLECTION (`students/{studentId}`)
+    // =========================================================================
     match /students/{studentId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isStaffMember();
       allow update, delete: if isSuperAdmin();
     }
 
-    // Student Approval Requests: Any authenticated staff can submit; only Super Admin can approve/reject
+    // =========================================================================
+    // 6. STUDENT APPROVAL REQUESTS (`student_approval_requests/{requestId}`)
+    // =========================================================================
     match /student_approval_requests/{requestId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isSuperAdmin();
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() &&
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.status == 'pending';
+      allow update: if isSuperAdmin() && (
+        resource.data.requesterUid != request.auth.uid || isOwner()
+      );
       allow delete: if isSuperAdmin();
     }
 
-    // Admissions
+    // =========================================================================
+    // 7. ADMISSIONS COLLECTION (`admissions/{admissionId}`)
+    // =========================================================================
     match /admissions/{admissionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isSuperAdmin();
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && isStaffMember();
+      allow update: if isSuperAdmin() || isPrincipal();
+      allow delete: if isSuperAdmin();
     }
 
-    // Teachers
+    // =========================================================================
+    // 8. STUDENT DAILY ATTENDANCE (`student_attendance/{attId}`)
+    // =========================================================================
+    match /student_attendance/{attId} {
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser() && isTeacher();
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================================
+    // 9. TEACHERS COLLECTION (`teachers/{teacherId}`)
+    // =========================================================================
     match /teachers/{teacherId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser() && isPrincipal();
       allow delete: if isSuperAdmin();
     }
 
-    // Teacher Attendance
+    // =========================================================================
+    // 10. TEACHER ATTENDANCE EVENTS (`teacher_attendance_events/{eventId}`)
+    // =========================================================================
     match /teacher_attendance_events/{eventId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isSuperAdmin();
+      allow read: if isActiveUser();
+      allow create: if isActiveUser() && (
+        isPrincipal() ||
+        (hasUserDoc() && (
+          !('teacherId' in getUserData()) ||
+          getUserData().teacherId == null ||
+          getUserData().teacherId == request.resource.data.teacherId
+        ))
+      );
+      allow update: if isPrincipal();
       allow delete: if isSuperAdmin();
     }
+
     match /attendance_corrections/{corrId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if false; // Immutable corrections
-    }
-
-    // Student Attendance
-    match /student_attendance/{attendanceId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow read: if isPrincipal();
+      allow create: if isPrincipal();
+      allow update: if false;
       allow delete: if isSuperAdmin();
     }
 
-    // Fee Payments: Financial safety - no direct deletion permitted
+    // =========================================================================
+    // 11. FINANCIAL COLLECTIONS: FEES, SALARY, CASHBOOK
+    // =========================================================================
     match /fee_payments/{paymentId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isSuperAdmin();
-      allow delete: if false; // Financial records preserved permanently
+      allow read: if isActiveUser() && (isAccountant() || isPrincipal());
+      allow create: if isActiveUser() && (isAccountant() || isPrincipal());
+      allow update: if isActiveUser() && (isSuperAdmin() || isAccountant()) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'receiptNumber', 'studentId', 'amount', 'paidAmount', 'paymentDate'
+        ]);
+      allow delete: if isSuperAdmin();
     }
 
-    // Salary & Payroll
     match /salary_payments/{salaryId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow get: if isActiveUser() && (
+        isAccountant() || isPrincipal() ||
+        (hasUserDoc() && getUserData().teacherId == resource.data.teacherId)
+      );
+      allow list: if isActiveUser() && (isAccountant() || isPrincipal());
+      allow create: if isActiveUser() && isAccountant();
       allow update: if isSuperAdmin();
-      allow delete: if false;
+      allow delete: if isSuperAdmin();
     }
 
-    // Cashbook & Accounting: Financial safety
     match /cash_transactions/{txId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
+      allow read: if isActiveUser() && isAccountant();
+      allow create: if isActiveUser() && (isAccountant() || isPrincipal());
       allow update: if isSuperAdmin();
-      allow delete: if false;
+      allow delete: if isSuperAdmin();
     }
 
-    // Class Routines & Exams
+    // =========================================================================
+    // 12. ACADEMIC STRUCTURE & EXAMS
+    // =========================================================================
+    match /madrasa_classes/{classId} {
+      allow read: if isActiveUser();
+      allow write: if isActiveUser() && isPrincipal();
+    }
+
+    match /sections/{sectionId} {
+      allow read: if isActiveUser();
+      allow write: if isActiveUser() && isPrincipal();
+    }
+
     match /class_routines/{routineId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isActiveUser();
+      allow write: if isActiveUser() && isTeacher();
     }
+
     match /examinations/{examId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isActiveUser();
+      allow write: if isActiveUser() && isPrincipal();
     }
+
     match /exam_marks/{markId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isActiveUser();
+      allow create, update: if isActiveUser() && isTeacher();
+      allow delete: if isActiveUser() && isPrincipal();
     }
 
-    // Notices
+    // =========================================================================
+    // 13. NOTICES, NOTIFICATIONS & AUDIT LOGS
+    // =========================================================================
     match /notices/{noticeId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isActiveUser();
+      allow write: if isActiveUser() && isPrincipal();
     }
 
-    // Notifications
     match /notifications/{notifId} {
       allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if isSuperAdmin();
     }
 
-    // Audit Logs: Completely immutable (write-only append, no update or delete by anyone)
     match /audit_logs/{logId} {
-      allow read: if isAuthenticated();
+      allow read: if isSuperAdmin();
       allow create: if isAuthenticated();
-      allow update, delete: if false; // Strict immutability
+      allow update: if false;
+      allow delete: if isSuperAdmin();
+    }
+
+    // =========================================================================
+    // 14. DEFAULT DENY
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

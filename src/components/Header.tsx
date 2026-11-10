@@ -107,6 +107,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
     principal: t.principal,
     teacher: t.teacher,
     accountant: t.accountant,
+    staff: language === 'bn' ? 'স্টাফ' : 'Staff',
   };
 
   // Determine avatar photo URL (Guaranteed to show photo for admin, Google photo for google users)

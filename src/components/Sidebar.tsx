@@ -18,8 +18,10 @@ import {
   FileSpreadsheet,
   Settings,
   Database,
+  ShieldCheck,
   X
 } from 'lucide-react';
+import { ERPModule } from '../types';
 
 interface SidebarProps {
   currentPage: string;
@@ -28,32 +30,51 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+interface NavItem {
+  id: string;
+  module: ERPModule;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: string[];
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage, isOpen, onClose }) => {
   const { t, language } = useLanguage();
-  const { role } = useAuth();
+  const { isSuperAdmin, hasPermission, canApproveRegistrations, role } = useAuth();
 
-  const currentRole = role || 'admin';
+  const currentRole = role || 'staff';
 
-  const navItems = [
-    { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'teacherAttendance', label: t.teacherAttendance, icon: MapPin, roles: ['admin', 'principal', 'teacher'] },
-    { id: 'teachers', label: t.teachers, icon: Users, roles: ['admin', 'principal'] },
-    { id: 'attendanceAudit', label: t.attendanceAudit, icon: ClipboardCheck, roles: ['admin', 'principal'] },
-    { id: 'students', label: t.students, icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'admissions', label: t.admissions, icon: UserPlus, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'studentAttendance', label: t.studentAttendance, icon: CalendarCheck, roles: ['admin', 'principal', 'teacher'] },
-    { id: 'feeManagement', label: t.feeManagement, icon: Receipt, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'teacherSalary', label: t.teacherSalary, icon: Wallet, roles: ['admin', 'principal', 'accountant', 'teacher'] },
-    { id: 'accounts', label: t.accounts, icon: BookOpen, roles: ['admin', 'accountant'] },
-    { id: 'routines', label: t.routines, icon: CalendarDays, roles: ['admin', 'principal', 'teacher'] },
-    { id: 'exams', label: t.exams, icon: Award, roles: ['admin', 'principal', 'teacher'] },
-    { id: 'notices', label: t.notices, icon: Bell, roles: ['admin', 'principal', 'teacher', 'accountant'] },
-    { id: 'reports', label: t.reports, icon: FileSpreadsheet, roles: ['admin', 'principal', 'accountant'] },
-    { id: 'settings', label: t.settings, icon: Settings, roles: ['admin'] },
-    { id: 'backupRestore', label: t.backupRestore, icon: Database, roles: ['admin'] },
+  const navItems: NavItem[] = [
+    { id: 'dashboard', module: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant', 'staff'] },
+    { id: 'userApprovals', module: 'userApprovals', label: t.userApprovals, icon: ShieldCheck, roles: ['admin', 'principal'] },
+    { id: 'teacherAttendance', module: 'attendance', label: t.teacherAttendance, icon: MapPin, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'teachers', module: 'teachers', label: t.teachers, icon: Users, roles: ['admin', 'principal'] },
+    { id: 'attendanceAudit', module: 'attendance', label: t.attendanceAudit, icon: ClipboardCheck, roles: ['admin', 'principal'] },
+    { id: 'students', module: 'students', label: t.students, icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant', 'staff'] },
+    { id: 'admissions', module: 'students', label: t.admissions, icon: UserPlus, roles: ['admin', 'principal', 'teacher', 'accountant', 'staff'] },
+    { id: 'studentAttendance', module: 'attendance', label: t.studentAttendance, icon: CalendarCheck, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'feeManagement', module: 'fees', label: t.feeManagement, icon: Receipt, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'teacherSalary', module: 'payroll', label: t.teacherSalary, icon: Wallet, roles: ['admin', 'principal', 'accountant', 'teacher'] },
+    { id: 'accounts', module: 'accounts', label: t.accounts, icon: BookOpen, roles: ['admin', 'accountant'] },
+    { id: 'routines', module: 'academic', label: t.routines, icon: CalendarDays, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'exams', module: 'academic', label: t.exams, icon: Award, roles: ['admin', 'principal', 'teacher'] },
+    { id: 'notices', module: 'notices', label: t.notices, icon: Bell, roles: ['admin', 'principal', 'teacher', 'accountant', 'staff'] },
+    { id: 'reports', module: 'reports', label: t.reports, icon: FileSpreadsheet, roles: ['admin', 'principal', 'accountant'] },
+    { id: 'settings', module: 'settings', label: t.settings, icon: Settings, roles: ['admin'] },
+    { id: 'backupRestore', module: 'backupRestore', label: t.backupRestore, icon: Database, roles: ['admin'] },
   ];
 
-  const allowedItems = navItems.filter(item => item.roles.includes(currentRole));
+  // Super Admin sees all. Others see what they are assigned and have permission for.
+  const allowedItems = navItems.filter(item => {
+    if (isSuperAdmin) return true;
+    if (item.id === 'userApprovals') {
+      return canApproveRegistrations || hasPermission('userApprovals', 'view');
+    }
+    // Must be allowed for their role AND have 'view' permission for the module
+    const roleMatch = item.roles.includes(currentRole);
+    const permMatch = hasPermission(item.module, 'view');
+    return roleMatch && permMatch;
+  });
 
   return (
     <>
@@ -97,9 +118,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage, isO
                   onClose();
                 }}
                 className={`
-                  w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all text-left
+                  w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all text-left
                   ${isActive 
-                    ? 'bg-blue-600 text-white shadow-md' 
+                    ? 'bg-gradient-to-r from-blue-700 to-indigo-700 text-white font-bold shadow-md' 
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'}
                 `}
               >
@@ -110,10 +131,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage, isO
           })}
         </nav>
 
-        {/* Footer info */}
-        <div className="p-3 bg-slate-950 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
-          <span className="truncate">{t.roleLabel}: <b className="text-amber-400">{t[currentRole] || currentRole}</b></span>
-          <span className="text-slate-500 font-mono">v1.0</span>
+        {/* Footer info in sidebar */}
+        <div className="p-3 border-t border-slate-800 text-[11px] text-slate-500 text-center">
+          {language === 'bn' ? 'মাদরাসা ম্যানেজমেন্ট সিস্টেম' : 'Madrasa Management ERP'}
         </div>
       </aside>
     </>

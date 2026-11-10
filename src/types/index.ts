@@ -1,4 +1,25 @@
-export type UserRole = 'admin' | 'principal' | 'teacher' | 'accountant';
+export type UserRole = 'admin' | 'principal' | 'teacher' | 'accountant' | 'staff';
+
+export type UserStatus = 'active' | 'pending' | 'rejected' | 'disabled';
+
+export type ERPModule = 
+  | 'dashboard'
+  | 'students' 
+  | 'teachers' 
+  | 'attendance' 
+  | 'fees' 
+  | 'payroll' 
+  | 'accounts' 
+  | 'academic' 
+  | 'notices' 
+  | 'reports' 
+  | 'settings' 
+  | 'backupRestore'
+  | 'userApprovals';
+
+export type PermissionAction = 'view' | 'add' | 'edit' | 'delete' | 'approve' | 'print' | 'export' | 'import';
+
+export type UserPermissions = Partial<Record<ERPModule, PermissionAction[]>>;
 
 export interface UserProfile {
   uid: string;
@@ -8,9 +29,34 @@ export interface UserProfile {
   photoURL?: string;
   role: UserRole;
   teacherId?: string;
-  status: 'active' | 'disabled';
+  status: UserStatus;
+  permissions?: UserPermissions;
+  registrationMethod?: 'email' | 'phone' | 'google';
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface RegistrationRequest {
+  id: string;
+  uid: string;
+  displayName: string;
+  email?: string;
+  phoneNumber?: string;
+  photoURL?: string;
+  registrationMethod: 'email' | 'phone' | 'google';
+  registrationDate: string;
+  status: 'pending' | 'approved' | 'rejected';
+  assignedRole?: UserRole;
+  assignedPermissions?: UserPermissions;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
 }
 
 export type ResidentialCategory = 'residential' | 'non_residential' | 'day_care';
@@ -40,6 +86,7 @@ export interface InstitutionSettings {
     non_residential: number;
     day_care: number;
   };
+  approverUids?: string[]; // UIDs of Admins/Principals authorized by Super Admin to approve registrations
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -58,6 +105,9 @@ export interface Teacher {
   employmentStatus: 'active' | 'inactive' | 'on_leave';
   salaryType: 'monthly' | 'hourly';
   baseSalary: number;
+  userId?: string; // Linked Firebase Auth UID
+  linkedAt?: string;
+  linkedBy?: string;
   notes?: string;
   createdAt: string;
 }
