@@ -45,9 +45,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onSelectPage, isO
   const currentRole = role || 'staff';
 
   const navItems: NavItem[] = [
+    { id: 'teacherAttendance', module: 'attendance', label: t.teacherAttendance, icon: MapPin, roles: ['admin', 'principal', 'teacher'] },
     { id: 'dashboard', module: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: ['admin', 'principal', 'teacher', 'accountant', 'staff'] },
     { id: 'userApprovals', module: 'userApprovals', label: t.userApprovals, icon: ShieldCheck, roles: ['admin', 'principal'] },
-    { id: 'teacherAttendance', module: 'attendance', label: t.teacherAttendance, icon: MapPin, roles: ['admin', 'principal', 'teacher'] },
     { id: 'teachers', module: 'teachers', label: t.teachers, icon: Users, roles: ['admin', 'principal'] },
     { id: 'attendanceAudit', module: 'attendance', label: t.attendanceAudit, icon: ClipboardCheck, roles: ['admin', 'principal'] },
     { id: 'students', module: 'students', label: t.students, icon: GraduationCap, roles: ['admin', 'principal', 'teacher', 'accountant', 'staff'] },

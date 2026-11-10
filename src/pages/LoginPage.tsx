@@ -84,6 +84,8 @@ export const LoginPage: React.FC = () => {
           return 'অতিরিক্ত চেষ্টা করা হয়েছে। সাময়িক ব্লকের জন্য কয়েক মিনিট পর চেষ্টা করুন।';
         case 'auth/popup-closed-by-user':
           return 'গুগল সাইন-ইন উইন্ডো বন্ধ করা হয়েছে। আবার চেষ্টা করুন।';
+        case 'auth/unauthorized-domain':
+          return 'গুগল লগইনের জন্য এই ডোমেনটি (jmnim.vercel.app) ফায়ারবেসে অনুমোদিত নয়। দয়া করে ফায়ারবেস কনসোলে (Authentication > Settings > Authorized Domains) jmnim.vercel.app ডোমেনটি যুক্ত করুন।';
         case 'auth/network-request-failed':
           return 'ইন্টারনেট সংযোগে সমস্যা হচ্ছে। আপনার ইন্টারনেট সংযোগ পরীক্ষা করুন।';
         default:
@@ -106,6 +108,8 @@ export const LoginPage: React.FC = () => {
           return 'Too many attempts. Please try again in a few minutes.';
         case 'auth/popup-closed-by-user':
           return 'Google sign-in popup was closed by user.';
+        case 'auth/unauthorized-domain':
+          return 'This domain (jmnim.vercel.app) is not authorized in Firebase Console. Please add it in Firebase Console > Authentication > Settings > Authorized Domains.';
         default:
           return err?.message || 'An unexpected error occurred. Please try again.';
       }

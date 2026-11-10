@@ -4,6 +4,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { MobileTopNav } from './components/MobileTopNav';
 import { LoginPage } from './pages/LoginPage';
 import { PendingApprovalPage } from './pages/PendingApprovalPage';
 import { UserApprovalsPage } from './pages/UserApprovalsPage';
@@ -49,7 +50,7 @@ const PAGE_MODULE_MAP: Record<string, ERPModule> = {
 };
 
 const MainLayout: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState<string>('dashboard');
+  const [currentPage, setCurrentPage] = useState<string>('teacherAttendance');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const { currentUser, userProfile, isSuperAdmin, canApproveRegistrations, loading, hasPermission } = useAuth();
 
@@ -146,6 +147,10 @@ const MainLayout: React.FC = () => {
       <Header 
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         onNavigate={(p) => setCurrentPage(p)}
+      />
+      <MobileTopNav 
+        currentPage={currentPage}
+        onSelectPage={(p) => setCurrentPage(p)}
       />
       <div className="flex-1 flex overflow-hidden relative">
         <Sidebar 
