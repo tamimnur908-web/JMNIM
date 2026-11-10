@@ -41,6 +41,25 @@ export type PermissionAction = 'view' | 'add' | 'edit' | 'delete' | 'approve' | 
 
 export type UserPermissions = Partial<Record<ERPModule, PermissionAction[]>>;
 
+export type ProvisioningStatus = 'pending' | 'provisioning' | 'completed' | 'partially_completed' | 'failed';
+
+export interface ModuleProvisioningState {
+  status: ProvisioningStatus;
+  provisionedAt?: string;
+  modules: {
+    auth: boolean;
+    userProfile: boolean;
+    registrationRequest: boolean;
+    teacherManagement?: boolean;
+    gpsAttendance?: boolean;
+    payroll?: boolean;
+    centralReports?: boolean;
+    permissions?: boolean;
+  };
+  errors?: string[];
+  repairedAt?: string;
+}
+
 export interface UserProfile {
   uid: string;
   email?: string;
@@ -48,11 +67,14 @@ export interface UserProfile {
   displayName: string;
   photoURL?: string;
   role: UserRole;
-  teacherId?: string;
+  staffId?: string; // e.g. STF-101, ACC-101
+  teacherId?: string; // T-101
+  teacherDocId?: string; // Doc ID in teachers collection
   status: UserStatus;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   accountStatus?: 'pending_approval' | 'active' | 'disabled' | 'rejected';
   permissions?: UserPermissions;
+  provisioning?: ModuleProvisioningState;
   registrationMethod?: 'email' | 'phone' | 'google';
   approvedBy?: string;
   approvedByName?: string;
@@ -111,6 +133,13 @@ export interface InstitutionSettings {
     day_care: number;
   };
   approverUids?: string[]; // UIDs of Admins/Principals authorized by Super Admin to approve registrations
+  // Auto Check-out and Missed Check-out Settings
+  autoCheckOutEnabled?: boolean;
+  autoCheckOutWaitingMinutes?: number; // Additional waiting period in minutes (e.g. 30)
+  autoCheckOutNotifyAdmin?: boolean;
+  autoCheckOutNotifyTeacher?: boolean;
+  missedCheckOutNotifyAdmin?: boolean;
+  missedCheckOutNotifyTeacher?: boolean;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -129,22 +158,95 @@ export interface Teacher {
   employmentStatus: 'active' | 'inactive' | 'on_leave';
   salaryType: 'monthly' | 'hourly';
   baseSalary: number;
+  isSalaryConfigured?: boolean; // false indicates "Salary Setup Required"
   userId?: string; // Linked Firebase Auth UID
+  authUid?: string;
+  provisioningStatus?: ProvisioningStatus;
   linkedAt?: string;
   linkedBy?: string;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type AttendanceEventType = 'check_in' | 'check_out';
-export type AttendanceStatus = 'present' | 'late' | 'early_leave' | 'leave' | 'absent' | 'missed_checkout';
+export type AttendanceStatus = 'present' | 'late' | 'early_leave' | 'leave' | 'absent' | 'missed_checkout' | 'auto_checkout';
+
+export type ScheduleTargetType = 'all' | 'selected';
+
+export interface AttendanceSchedule {
+  id: string;
+  name: string; // e.g., "সকাল শিফট (Morning Session)", "হিফজ বিকেল শিফট (Afternoon Hifz)"
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  graceMinutes: number; // e.g. 15
+  autoCheckoutWaitingMinutes: number; // e.g. 30
+  applicableDays: string[]; // e.g. ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"]
+  targetType: ScheduleTargetType; // 'all' or 'selected'
+  assignedTeacherIds?: string[]; // e.g. ["T-101", "T-102"]
+  assignedTeacherNames?: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type LeaveType = 'illness' | 'personal' | 'family_emergency' | 'medical' | 'other';
+export type LeaveScope = 'full_day' | 'partial_day' | 'session';
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface TeacherLeaveApplication {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  teacherDocId?: string;
+  teacherUid: string;
+  leaveType: LeaveType | string;
+  leaveTypeName?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  scope: LeaveScope;
+  leaveScope?: LeaveScope;
+  totalDays?: number;
+  targetScheduleId?: string;
+  targetScheduleName?: string;
+  specificSessionName?: string;
+  reason: string; // MANDATORY! Must be detailed, cannot be blank
+  supportingDocUrl?: string;
+  status: LeaveStatus;
+  appliedAt: string;
+  reviewedBy?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  reviewRemarks?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  approverRemarks?: string;
+  isDirectGrant?: boolean; // true if granted directly by Admin / Principal
+  grantedBy?: string;
+  grantedByName?: string;
+  grantedAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AttendanceInterval {
+  checkIn: TeacherAttendanceEvent;
+  checkOut?: TeacherAttendanceEvent;
+  durationMinutes?: number;
+  isOpen: boolean;
+}
 
 export interface TeacherAttendanceEvent {
   id: string;
   teacherId: string;
   teacherName: string;
+  teacherDocId?: string;
+  teacherUid?: string;
   date: string; // YYYY-MM-DD
   eventType: AttendanceEventType;
+  scheduleId?: string; // ID of the schedule session
+  scheduleName?: string; // Name of the schedule session
+  intervalIndex?: number; // 1, 2, 3... within that day/session
   time: string; // HH:mm:ss
   timestamp: string; // ISO
   lat: number;
@@ -156,6 +258,13 @@ export interface TeacherAttendanceEvent {
   isManualCorrection?: boolean;
   correctionReason?: string;
   correctedBy?: string;
+  isManualEntry?: boolean;
+  recordedBy?: string;
+  recordedByUid?: string;
+  recordedByRole?: string;
+  isAutoCheckout?: boolean;
+  autoCheckoutReason?: string;
+  missedCheckoutNotified?: boolean;
   originalValues?: Partial<TeacherAttendanceEvent>;
   notes?: string;
 }
@@ -347,12 +456,19 @@ export interface SalaryProfile {
   effectiveFrom: string;
 }
 
+export type SalaryPaymentStatus = 'paid' | 'cancelled' | 'adjusted';
+export type SalaryAcknowledgmentStatus = 'pending' | 'acknowledged' | 'legacy';
+
 export interface SalaryPayment {
   id: string;
   voucherNumber: string; // Unique, e.g. SAL-2024-01-001
   teacherId: string;
   teacherName: string;
-  month: string; // e.g. "২০২৪-০১"
+  teacherUid?: string; // Linked Firebase Auth UID
+  teacherDocId?: string; // Linked teachers collection Doc ID
+  designation?: string;
+  department?: string;
+  month: string; // YYYY-MM e.g. "2024-01"
   baseSalary: number;
   allowances: number;
   bonus: number;
@@ -362,12 +478,23 @@ export interface SalaryPayment {
   payableAmount: number;
   paidAmount: number;
   balanceDue: number;
-  paymentDate: string;
+  paymentDate: string; // YYYY-MM-DD
   paymentMethod: 'cash' | 'bank' | 'bkash';
   referenceNo?: string;
   preparedBy: string;
   remarks?: string;
+  paymentStatus?: SalaryPaymentStatus;
+  acknowledgmentStatus?: SalaryAcknowledgmentStatus;
+  signatureUrl?: string; // Digital signature image URL or data URL
+  acknowledgedAt?: string; // ISO timestamp
+  acknowledgedByUid?: string;
+  acknowledgedByName?: string;
+  acknowledgmentDeclaration?: string;
+  acknowledgmentLanguage?: 'bn' | 'en';
+  receiptNumber?: string;
+  lastReminderSentAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface SalaryAdvance {
@@ -482,11 +609,13 @@ export interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  type: 'approval_request' | 'approval_result' | 'import_summary' | 'system';
+  type: 'approval_request' | 'approval_result' | 'import_summary' | 'system' | 'salary_payment' | 'salary_reminder';
   read: boolean;
   linkPage?: string;
   targetRole?: UserRole[];
   targetUid?: string;
+  salaryPaymentId?: string;
+  salaryMonth?: string;
   applicantUid?: string;
   applicantName?: string;
   registrationMethod?: 'email' | 'phone' | 'google';

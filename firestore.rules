@@ -170,19 +170,47 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 10. TEACHER ATTENDANCE EVENTS (`teacher_attendance_events/{eventId}`)
+    // 10. TEACHER ATTENDANCE, SCHEDULES & LEAVE APPLICATIONS
     // =========================================================================
     match /teacher_attendance_events/{eventId} {
       allow read: if isActiveUser();
+      // Only Principal/Admin or an authenticated linked Teacher matching the exact teacherId
       allow create: if isActiveUser() && (
         isPrincipal() ||
-        (hasUserDoc() && (
-          !('teacherId' in getUserData()) ||
-          getUserData().teacherId == null ||
+        (
+          hasUserDoc() && 
+          ('teacherId' in getUserData()) && 
+          getUserData().teacherId != null &&
           getUserData().teacherId == request.resource.data.teacherId
-        ))
+        )
       );
+      // Ordinary teachers cannot edit attendance; only Principals/Admins can perform overrides
       allow update: if isPrincipal();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /attendance_schedules/{scheduleId} {
+      allow read: if isActiveUser();
+      allow write: if isPrincipal();
+    }
+
+    match /teacher_leave_applications/{leaveId} {
+      allow read: if isActiveUser() && (
+        isApprover() || 
+        (hasUserDoc() && getUserData().teacherId != null && getUserData().teacherId == resource.data.teacherId) ||
+        (resource.data.applicantUid != null && resource.data.applicantUid == request.auth.uid)
+      );
+      // Teacher can apply with status 'pending' and mandatory reason (minimum 5 chars)
+      // Approver can directly create (e.g., admin granting leave)
+      allow create: if isActiveUser() && (
+        isApprover() ||
+        (
+          request.resource.data.status == 'pending' &&
+          request.resource.data.reason != null &&
+          request.resource.data.reason.size() >= 5
+        )
+      );
+      allow update: if isApprover();
       allow delete: if isSuperAdmin();
     }
 
@@ -209,11 +237,34 @@ service cloud.firestore {
     match /salary_payments/{salaryId} {
       allow get: if isActiveUser() && (
         isAccountant() || isPrincipal() ||
-        (hasUserDoc() && getUserData().teacherId == resource.data.teacherId)
+        (hasUserDoc() && (
+          (getUserData().teacherId != null && getUserData().teacherId == resource.data.teacherId) ||
+          (resource.data.teacherUid != null && resource.data.teacherUid == request.auth.uid)
+        ))
       );
-      allow list: if isActiveUser() && (isAccountant() || isPrincipal());
-      allow create: if isActiveUser() && isAccountant();
-      allow update: if isSuperAdmin();
+      allow list: if isActiveUser() && (
+        isAccountant() || isPrincipal() ||
+        (hasUserDoc() && (
+          (getUserData().teacherId != null && resource.data.teacherId == getUserData().teacherId) ||
+          (resource.data.teacherUid != null && resource.data.teacherUid == request.auth.uid)
+        ))
+      );
+      allow create: if isActiveUser() && (isAccountant() || isPrincipal());
+      allow update: if isSuperAdmin() || (
+        isActiveUser() && hasUserDoc() &&
+        (
+          (getUserData().teacherId != null && resource.data.teacherId == getUserData().teacherId) ||
+          (resource.data.teacherUid != null && resource.data.teacherUid == request.auth.uid)
+        ) &&
+        (resource.data.acknowledgmentStatus != 'acknowledged') &&
+        request.resource.data.acknowledgmentStatus == 'acknowledged' &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'voucherNumber', 'teacherId', 'teacherName', 'month', 'baseSalary',
+          'allowances', 'bonus', 'advanceDeduction', 'otherDeduction',
+          'attendanceDeduction', 'payableAmount', 'paidAmount', 'balanceDue',
+          'paymentDate', 'paymentMethod', 'preparedBy'
+        ])
+      );
       allow delete: if isSuperAdmin();
     }
 

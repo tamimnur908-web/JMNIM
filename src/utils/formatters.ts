@@ -82,3 +82,24 @@ export function formatDate(dateStr: string, isBengali: boolean = true): string {
     return `${date.getDate()} ${monthsEn[date.getMonth()]} ${date.getFullYear()}`;
   }
 }
+
+export function formatSalaryMonth(monthStr: string, isBengali: boolean = true): string {
+  if (!monthStr) return '';
+  const parts = monthStr.split('-');
+  if (parts.length < 2) return monthStr;
+  const year = parseInt(parts[0], 10);
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  const monthsBn = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  ];
+  const monthsEn = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  if (monthIdx < 0 || monthIdx > 11) return monthStr;
+  if (isBengali) {
+    return `${monthsBn[monthIdx]} ${toBengaliNumber(year)}`;
+  }
+  return `${monthsEn[monthIdx]} ${year}`;
+}

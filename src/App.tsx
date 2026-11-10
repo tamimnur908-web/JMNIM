@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { SettingsProvider } from './context/SettingsContext';
@@ -28,6 +28,8 @@ import { CentralReportsPage } from './pages/CentralReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { BackupRestorePage } from './pages/BackupRestorePage';
 import { ERPModule, isPendingStatus } from './types';
+import { useSettings } from './context/SettingsContext';
+import { runAttendanceSentinel } from './utils/attendanceSentinel';
 
 const PAGE_MODULE_MAP: Record<string, ERPModule> = {
   dashboard: 'dashboard',
@@ -53,6 +55,17 @@ const MainLayout: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<string>('teacherAttendance');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const { currentUser, userProfile, isSuperAdmin, canApproveRegistrations, loading, hasPermission } = useAuth();
+  const { settings } = useSettings();
+
+  // Background attendance sentinel timer (every 60 seconds)
+  useEffect(() => {
+    if (!currentUser || !settings) return;
+    runAttendanceSentinel(settings);
+    const interval = setInterval(() => {
+      runAttendanceSentinel(settings);
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [currentUser, settings]);
 
   if (loading) {
     return (

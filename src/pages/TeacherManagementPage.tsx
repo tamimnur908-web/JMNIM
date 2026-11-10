@@ -9,7 +9,8 @@ import {
   deleteDoc, 
   doc, 
   query, 
-  where 
+  where,
+  onSnapshot 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { 
@@ -116,7 +117,19 @@ export const TeacherManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadTeachers();
+    setLoading(true);
+    const unsub = onSnapshot(collection(db, 'teachers'), (snap) => {
+      const list: Teacher[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...d.data() } as Teacher));
+      list.sort((a, b) => (a.teacherId || '').localeCompare(b.teacherId || ''));
+      setTeachers(list);
+      setLoading(false);
+    }, (err) => {
+      console.warn("Could not listen to teachers:", err);
+      setLoading(false);
+    });
+
+    return () => unsub();
   }, []);
 
   const resetAddForm = () => {

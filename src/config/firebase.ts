@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 export const firebaseConfig = {
   apiKey: "AIzaSyCCA9L_y-389xBnuWwR183v6ZEjg2u9KSQ",
@@ -14,6 +15,7 @@ export const firebaseConfig = {
 // Initialize Firebase safely
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // Ensure login session is always saved and persistent across browser refreshes/closes
 setPersistence(auth, browserLocalPersistence).catch((err) => {

@@ -38,7 +38,10 @@ import {
   Ban,
   Slash,
   Eye,
-  CheckCircle
+  CheckCircle,
+  Link,
+  Unlink,
+  UserPlus
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -48,6 +51,7 @@ import {
   PermissionAction, 
   UserPermissions, 
   RegistrationRequest,
+  Teacher,
   isPendingStatus
 } from '../types';
 import { logAudit } from '../utils/auditLogger';
@@ -180,6 +184,20 @@ export const UserApprovalsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  // Teacher Profile Linking State (Requirement 1)
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [selectedTeacherDocId, setSelectedTeacherDocId] = useState<string>('');
+  const [teacherLinkMode, setTeacherLinkMode] = useState<'existing' | 'new' | 'later'>('existing');
+  const [newTeacherForm, setNewTeacherForm] = useState({
+    teacherId: `T-${Math.floor(100 + Math.random() * 900)}`,
+    fullName: '',
+    phone: '',
+    designation: 'সহকারী শিক্ষক',
+    department: 'হিফজ',
+    baseSalary: 10000,
+    joiningDate: new Date().toISOString().split('T')[0]
+  });
+
   // Controlled Repair Preview State
   const [repairCandidates, setRepairCandidates] = useState<UserProfile[]>([]);
   const [repairing, setRepairing] = useState(false);
@@ -272,9 +290,22 @@ export const UserApprovalsPage: React.FC = () => {
       setLoading(false);
     });
 
+    // Real-time listener for teachers (Requirement 1)
+    const unsubTeachers = onSnapshot(collection(db, 'teachers'), (tSnap) => {
+      const tList: Teacher[] = [];
+      tSnap.forEach(d => {
+        tList.push({ id: d.id, ...d.data() } as Teacher);
+      });
+      tList.sort((a, b) => a.teacherId.localeCompare(b.teacherId));
+      setTeachers(tList);
+    }, (err) => {
+      console.warn("Teachers onSnapshot error:", err);
+    });
+
     return () => {
       unsubUsers();
       unsubReqs();
+      unsubTeachers();
     };
   }, []);
 
@@ -376,6 +407,45 @@ export const UserApprovalsPage: React.FC = () => {
     setPermissions(existingPerms);
     setRejectionReason('');
     setActionSuccess(null);
+
+    // Initialize teacher linking state (Requirement 1)
+    const targetUid = (user as any).uid || (user as any).id;
+    const existingTeacherId = (user as UserProfile).teacherId;
+    const existingTeacherDocId = (user as UserProfile).teacherDocId;
+
+    if (existingTeacherDocId) {
+      setSelectedTeacherDocId(existingTeacherDocId);
+      setTeacherLinkMode('existing');
+    } else if (existingTeacherId) {
+      const match = teachers.find(t => t.teacherId === existingTeacherId);
+      setSelectedTeacherDocId(match ? match.id : '');
+      setTeacherLinkMode('existing');
+    } else {
+      const linkedToMe = teachers.find(t => t.userId === targetUid);
+      if (linkedToMe) {
+        setSelectedTeacherDocId(linkedToMe.id);
+        setTeacherLinkMode('existing');
+      } else {
+        const unlinked = teachers.filter(t => !t.userId || t.userId === '');
+        if (unlinked.length > 0) {
+          setSelectedTeacherDocId(unlinked[0].id);
+          setTeacherLinkMode('existing');
+        } else {
+          setSelectedTeacherDocId('');
+          setTeacherLinkMode('new');
+        }
+      }
+    }
+
+    setNewTeacherForm({
+      teacherId: (user as UserProfile).teacherId || `T-${Math.floor(100 + Math.random() * 900)}`,
+      fullName: user.displayName || '',
+      phone: user.phoneNumber || '',
+      designation: 'সহকারী শিক্ষক',
+      department: 'হিফজ',
+      baseSalary: 10000,
+      joiningDate: new Date().toISOString().split('T')[0]
+    });
   };
 
   const openRejectModal = (user: UserProfile | RegistrationRequest) => {
@@ -407,6 +477,64 @@ export const UserApprovalsPage: React.FC = () => {
       const uid = selectedUser.uid;
       const now = new Date().toISOString();
 
+      let finalTeacherId = (selectedUser as UserProfile).teacherId || null;
+      let finalTeacherDocId = (selectedUser as UserProfile).teacherDocId || null;
+
+      // Handle Teacher Profile Linking (Requirement 1)
+      if (assignedRole === 'teacher') {
+        if (teacherLinkMode === 'existing' && selectedTeacherDocId) {
+          const matchedTeacher = teachers.find(t => t.id === selectedTeacherDocId);
+          if (matchedTeacher) {
+            // Verify this account isn't linked to another teacher profile
+            const otherTeacherLinked = teachers.find(t => t.userId === uid && t.id !== matchedTeacher.id);
+            if (otherTeacherLinked) {
+              await updateDoc(doc(db, 'teachers', otherTeacherLinked.id), {
+                userId: null,
+                authUid: null,
+                updatedAt: now
+              });
+            }
+
+            finalTeacherId = matchedTeacher.teacherId;
+            finalTeacherDocId = matchedTeacher.id;
+
+            await updateDoc(doc(db, 'teachers', matchedTeacher.id), {
+              userId: uid,
+              authUid: uid,
+              linkedAt: now,
+              linkedBy: currentUser?.displayName || 'Authorized Approver',
+              linkedEmail: selectedUser.email || '',
+              updatedAt: now
+            });
+          }
+        } else if (teacherLinkMode === 'new') {
+          const genId = newTeacherForm.teacherId.trim() || `T-${Math.floor(100 + Math.random() * 900)}`;
+          const newDocRef = await addDoc(collection(db, 'teachers'), {
+            teacherId: genId,
+            fullName: newTeacherForm.fullName.trim() || selectedUser.displayName,
+            phone: newTeacherForm.phone.trim() || selectedUser.phoneNumber || '',
+            email: selectedUser.email || '',
+            designation: newTeacherForm.designation.trim() || 'সহকারী শিক্ষক',
+            department: newTeacherForm.department.trim() || 'হিফজ',
+            baseSalary: Number(newTeacherForm.baseSalary) || 10000,
+            joiningDate: newTeacherForm.joiningDate || now.split('T')[0],
+            employmentStatus: 'active',
+            salaryType: 'monthly',
+            userId: uid,
+            authUid: uid,
+            linkedAt: now,
+            linkedBy: currentUser?.displayName || 'Authorized Approver',
+            createdAt: now,
+            updatedAt: now
+          });
+          finalTeacherId = genId;
+          finalTeacherDocId = newDocRef.id;
+        } else if (teacherLinkMode === 'later') {
+          finalTeacherId = null;
+          finalTeacherDocId = null;
+        }
+      }
+
       // 1. Update user profile document in `users` collection
       const userDocRef = doc(db, 'users', uid);
       await updateDoc(userDocRef, {
@@ -415,6 +543,8 @@ export const UserApprovalsPage: React.FC = () => {
         approvalStatus: 'approved',
         role: assignedRole,
         permissions: permissions,
+        teacherId: finalTeacherId,
+        teacherDocId: finalTeacherDocId,
         approvedBy: currentUser?.uid || 'Admin',
         approvedByName: currentUser?.displayName || 'Authorized Approver',
         approvedAt: now,
@@ -999,6 +1129,25 @@ export const UserApprovalsPage: React.FC = () => {
                             }`}>
                               {u.role ? u.role.toUpperCase() : 'STAFF'}
                             </span>
+                            {u.role === 'teacher' && (
+                              <div className="mt-1">
+                                {u.teacherId ? (
+                                  <span className="text-[10px] text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded font-mono font-bold block w-fit">
+                                    ID: {u.teacherId}
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openReviewModal(u)}
+                                    title={isBn ? "শিক্ষক প্রোফাইল লিঙ্ক করুন" : "Link Teacher Profile"}
+                                    className="text-[10px] text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-300 px-1.5 py-0.5 rounded font-bold flex items-center space-x-1 w-fit transition animate-pulse"
+                                  >
+                                    <AlertCircle className="w-3 h-3 text-rose-500" />
+                                    <span>{isBn ? "প্রোফাইল লিংকিং প্রয়োজন" : "Link Required"}</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </td>
                           <td className="py-3 px-4">
                             <button
@@ -1191,6 +1340,203 @@ export const UserApprovalsPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {/* 1.5. TEACHER PROFILE LINKING (Requirement 1) */}
+              {assignedRole === 'teacher' && (
+                <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-amber-950 uppercase tracking-wider flex items-center space-x-1.5">
+                      <Link className="w-4 h-4 text-amber-600" />
+                      <span>{isBn ? "২. শিক্ষক প্রোফাইল লিংকিং (Teacher Profile Linking) *" : "2. Teacher Profile Linking *"}</span>
+                    </label>
+                    <span className="text-[11px] text-amber-800 font-semibold">
+                      {isBn ? "GPS হাজিরা প্রদানের জন্য আবশ্যক" : "Required for GPS Attendance"}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-600">
+                    {isBn 
+                      ? "এই অ্যাকাউন্টের সাথে মাদরাসার শিক্ষক প্রোফাইল সংযুক্ত করুন। শিক্ষক প্রোফাইল লিঙ্ক না থাকলে ইউজার জিপিএস হাজিরা দিতে পারবেন না।"
+                      : "Link this user account with a teacher profile to grant GPS attendance access."}
+                  </p>
+
+                  {/* Mode Switcher */}
+                  <div className="flex bg-white/80 p-1 rounded-xl border border-amber-200 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setTeacherLinkMode('existing')}
+                      className={`flex-1 py-1.5 rounded-lg transition ${
+                        teacherLinkMode === 'existing' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 hover:bg-amber-100/50'
+                      }`}
+                    >
+                      {isBn ? "বিদ্যমান প্রোফাইল নির্বাচন" : "Select Existing Profile"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeacherLinkMode('new')}
+                      className={`flex-1 py-1.5 rounded-lg transition ${
+                        teacherLinkMode === 'new' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 hover:bg-amber-100/50'
+                      }`}
+                    >
+                      {isBn ? "+ নতুন প্রোফাইল তৈরি" : "+ Create New Profile"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTeacherLinkMode('later')}
+                      className={`flex-1 py-1.5 rounded-lg transition ${
+                        teacherLinkMode === 'later' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-700 hover:bg-amber-100/50'
+                      }`}
+                    >
+                      {isBn ? "পরে লিঙ্ক করুন" : "Link Later"}
+                    </button>
+                  </div>
+
+                  {/* Option A: Select Existing Unlinked Profile */}
+                  {teacherLinkMode === 'existing' && (
+                    <div className="space-y-3">
+                      {teachers.filter(t => !t.userId || t.userId === '' || t.userId === selectedUser.uid).length === 0 ? (
+                        <div className="p-3 bg-white rounded-xl border border-amber-200 text-center space-y-1.5">
+                          <p className="font-bold text-amber-900">{isBn ? "কোনো আনলিঙ্কড শিক্ষক প্রোফাইল পাওয়া যায়নি" : "No unlinked teacher profiles found"}</p>
+                          <p className="text-[11px] text-slate-500">{isBn ? "অনুগ্রহ করে '+ নতুন প্রোফাইল তৈরি' অপশনটি বেছে নিন।" : "Please choose '+ Create New Profile'."}</p>
+                          <button
+                            type="button"
+                            onClick={() => setTeacherLinkMode('new')}
+                            className="px-3 py-1 bg-amber-600 text-white rounded-lg text-xs font-bold"
+                          >
+                            {isBn ? "নতুন প্রোফাইল তৈরি করুন" : "Create New Profile"}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <label className="block text-[11px] font-bold text-slate-700">
+                            {isBn ? "আনলিঙ্কড শিক্ষক তালিকা থেকে নির্বাচন করুন:" : "Select Unlinked Teacher Profile:"}
+                          </label>
+                          <select
+                            value={selectedTeacherDocId}
+                            onChange={(e) => setSelectedTeacherDocId(e.target.value)}
+                            className="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 font-medium"
+                          >
+                            <option value="">{isBn ? "-- শিক্ষক প্রোফাইল বেছে নিন --" : "-- Choose Teacher Profile --"}</option>
+                            {teachers
+                              .filter(t => !t.userId || t.userId === '' || t.userId === selectedUser.uid)
+                              .map(t => (
+                                <option key={t.id} value={t.id}>
+                                  {t.fullName} ({t.teacherId}) - {t.designation} {t.phone ? `(${t.phone})` : ''} {t.userId === selectedUser.uid ? '✓ (Currently Linked)' : ''}
+                                </option>
+                              ))}
+                          </select>
+
+                          {/* Selected Teacher Details Verification Card */}
+                          {selectedTeacherDocId && (
+                            (() => {
+                              const t = teachers.find(item => item.id === selectedTeacherDocId);
+                              if (!t) return null;
+                              return (
+                                <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-xs space-y-1.5 text-xs animate-fadeIn">
+                                  <div className="flex items-center justify-between border-b pb-1">
+                                    <span className="font-bold text-slate-900">{t.fullName}</span>
+                                    <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[10px]">
+                                      ID: {t.teacherId}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
+                                    <div><b>পদবী:</b> {t.designation || '—'}</div>
+                                    <div><b>বিভাগ:</b> {t.department || '—'}</div>
+                                    <div><b>মোবাইল:</b> {t.phone || '—'}</div>
+                                    <div><b>বেসিক বেতন:</b> {t.baseSalary ? `${t.baseSalary} ৳` : '—'}</div>
+                                  </div>
+                                  <div className="text-[10px] text-emerald-700 font-semibold pt-1 border-t flex items-center space-x-1">
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>{isBn ? "যাচাইকৃত: অনুমোদনের সাথে সাথে এই প্রোফাইলটি লিঙ্ক হবে।" : "Verified: Profile will be linked upon approval."}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Option B: Create New Profile On-the-fly */}
+                  {teacherLinkMode === 'new' && (
+                    <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-3 text-xs">
+                      <span className="font-bold text-amber-900 block">{isBn ? "নতুন শিক্ষক প্রোফাইলের তথ্য প্রদান করুন:" : "New Teacher Information:"}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">{isBn ? "শিক্ষক আইডি (Teacher ID)*" : "Teacher ID*"}</label>
+                          <input
+                            type="text"
+                            value={newTeacherForm.teacherId}
+                            onChange={(e) => setNewTeacherForm({ ...newTeacherForm, teacherId: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg font-mono font-bold text-xs"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">{isBn ? "পূর্ণ নাম (Full Name)*" : "Full Name*"}</label>
+                          <input
+                            type="text"
+                            value={newTeacherForm.fullName}
+                            onChange={(e) => setNewTeacherForm({ ...newTeacherForm, fullName: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">{isBn ? "পদবী (Designation)*" : "Designation*"}</label>
+                          <input
+                            type="text"
+                            value={newTeacherForm.designation}
+                            onChange={(e) => setNewTeacherForm({ ...newTeacherForm, designation: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">{isBn ? "বিভাগ (Department)" : "Department"}</label>
+                          <input
+                            type="text"
+                            value={newTeacherForm.department}
+                            onChange={(e) => setNewTeacherForm({ ...newTeacherForm, department: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">{isBn ? "মোবাইল নম্বর" : "Phone"}</label>
+                          <input
+                            type="text"
+                            value={newTeacherForm.phone}
+                            onChange={(e) => setNewTeacherForm({ ...newTeacherForm, phone: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">{isBn ? "বেসিক বেতন (মাসিক)" : "Base Salary (Monthly)"}</label>
+                          <input
+                            type="number"
+                            value={newTeacherForm.baseSalary}
+                            onChange={(e) => setNewTeacherForm({ ...newTeacherForm, baseSalary: Number(e.target.value) })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Option C: Link Later */}
+                  {teacherLinkMode === 'later' && (
+                    <div className="p-3 bg-amber-100/70 text-amber-900 border border-amber-300 rounded-xl text-xs space-y-1">
+                      <p className="font-bold">{isBn ? "সতর্কতা: শিক্ষক প্রোফাইল পরে লিঙ্ক করা হবে" : "Warning: Linking Deferred"}</p>
+                      <p className="text-[11px]">
+                        {isBn 
+                          ? "অ্যাকাউন্টটি অনুমোদিত হলেও কোনো শিক্ষক প্রোফাইল লিঙ্ক থাকবে না। ব্যবহারকারী সিস্টেমে লগইন করতে পারলেও শিক্ষক প্রোফাইল লিঙ্ক না করা পর্যন্ত GPS হাজিরা প্রদান করতে পারবেন না।"
+                          : "User will be approved without a teacher profile. GPS attendance will be blocked until linked."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 2. Granular Module & Action Permissions */}
               <div className="space-y-2">

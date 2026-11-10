@@ -378,6 +378,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasPermission = (module: ERPModule, action: PermissionAction): boolean => {
     if (isSuperAdmin) return true;
     if (status !== 'active') return false;
+    // Critical: Teachers can always view and print their own salary records
+    if (role === 'teacher' && module === 'payroll' && (action === 'view' || action === 'print')) return true;
     if (!userProfile?.permissions) return false;
     const modulePerms = userProfile.permissions[module];
     if (!modulePerms || !Array.isArray(modulePerms)) return false;

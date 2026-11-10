@@ -26,6 +26,12 @@ export const DEFAULT_SETTINGS: InstitutionSettings = {
     non_residential: 1500,
     day_care: 2200,
   },
+  autoCheckOutEnabled: true,
+  autoCheckOutWaitingMinutes: 30,
+  autoCheckOutNotifyAdmin: true,
+  autoCheckOutNotifyTeacher: true,
+  missedCheckOutNotifyAdmin: true,
+  missedCheckOutNotifyTeacher: true,
 };
 
 interface SettingsContextType {
