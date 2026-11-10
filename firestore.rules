@@ -1,0 +1,148 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.uid == "ymWfOe8MvbeLT2Pw1ILqDI4F8yH3" ||
+        (request.auth.token.email != null && request.auth.token.email == "tamimnur908@gmail.com") ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+    }
+
+    // Institution Settings
+    match /institution_settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // Classes & Sections
+    match /madrasa_classes/{classId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    match /sections/{sectionId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    // Students: All authenticated staff can add; only Super Admin can edit or delete
+    match /students/{studentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Student Approval Requests: Any authenticated staff can submit; only Super Admin can approve/reject
+    match /student_approval_requests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Admissions
+    match /admissions/{admissionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // Teachers
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Teacher Attendance
+    match /teacher_attendance_events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+    match /attendance_corrections/{corrId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable corrections
+    }
+
+    // Student Attendance
+    match /student_attendance/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Fee Payments: Financial safety - no direct deletion permitted
+    match /fee_payments/{paymentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin();
+      allow delete: if false; // Financial records preserved permanently
+    }
+
+    // Salary & Payroll
+    match /salary_payments/{salaryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin();
+      allow delete: if false;
+    }
+
+    // Cashbook & Accounting: Financial safety
+    match /cash_transactions/{txId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isSuperAdmin();
+      allow delete: if false;
+    }
+
+    // Class Routines & Exams
+    match /class_routines/{routineId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    match /examinations/{examId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    match /exam_marks/{markId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Notices
+    match /notices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isSuperAdmin();
+    }
+
+    // Audit Logs: Completely immutable (write-only append, no update or delete by anyone)
+    match /audit_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Strict immutability
+    }
+  }
+}

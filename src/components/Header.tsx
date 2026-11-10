@@ -1,0 +1,331 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from '../context/LanguageContext';
+import { useSettings } from '../context/SettingsContext';
+import { useAuth } from '../context/AuthContext';
+import { collection, getDocs, doc, updateDoc, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { 
+  Globe, 
+  Clock, 
+  Shield, 
+  LogOut, 
+  Menu, 
+  ChevronDown, 
+  CheckCircle,
+  Bell,
+  ExternalLink
+} from 'lucide-react';
+import { NotificationItem } from '../types';
+
+interface HeaderProps {
+  onToggleSidebar: () => void;
+  onNavigate?: (page: string) => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) => {
+  const { language, setLanguage, t } = useLanguage();
+  const { settings } = useSettings();
+  const { currentUser, userProfile, role, isSuperAdmin, logout } = useAuth();
+  const [timeStr, setTimeStr] = useState<string>('');
+  const [dropdownOpen, setDropdownOpen] = useState<boolean>(false);
+  const [notifOpen, setNotifOpen] = useState<boolean>(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Load Notifications
+  const loadNotifications = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'notifications'));
+      const list: NotificationItem[] = [];
+      snap.forEach(d => list.push({ id: d.id, ...d.data() } as NotificationItem));
+      list.sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1));
+      setNotifications(list.slice(0, 10));
+    } catch (err) {
+      // safe fallback
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000); // 30s refresh
+    return () => clearInterval(interval);
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const handleMarkAsRead = async (notif: NotificationItem) => {
+    try {
+      if (!notif.read) {
+        await updateDoc(doc(db, 'notifications', notif.id), { read: true });
+        setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+      }
+      if (notif.linkPage && onNavigate) {
+        setNotifOpen(false);
+        onNavigate(notif.linkPage);
+      }
+    } catch (err) {
+      console.warn("Could not mark notif as read:", err);
+    }
+  };
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: 'Asia/Dhaka',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      };
+      const formatted = new Intl.DateTimeFormat(language === 'bn' ? 'bn-BD' : 'en-US', options).format(now);
+      setTimeStr(formatted);
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [language]);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const roleLabels: Record<string, string> = {
+    admin: language === 'bn' ? 'সুপার অ্যাডমিন' : 'Super Admin',
+    principal: t.principal,
+    teacher: t.teacher,
+    accountant: t.accountant,
+  };
+
+  // Determine avatar photo URL (Guaranteed to show photo for admin, Google photo for google users)
+  const getAvatarUrl = (): string => {
+    if (currentUser?.photoURL) return currentUser.photoURL;
+    if (userProfile?.photoURL) return userProfile.photoURL;
+    const providerPhoto = currentUser?.providerData?.find(p => p.photoURL)?.photoURL;
+    if (providerPhoto) return providerPhoto;
+    
+    // Always fallback to admin profile picture from user upload
+    return '/admin-avatar.png';
+  };
+
+  const avatarUrl = getAvatarUrl();
+
+  const handleLogout = async () => {
+    setDropdownOpen(false);
+    await logout();
+  };
+
+  return (
+    <header className="h-16 w-full bg-white border-b border-slate-200 shrink-0 z-30 shadow-sm no-print">
+      <div className="h-full px-3 sm:px-5 flex items-center justify-between">
+        {/* Left Side: Mobile toggle & Institution Branding */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          <button
+            onClick={onToggleSidebar}
+            className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden focus:outline-none"
+            title="Toggle Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          
+          <div className="flex items-center space-x-2.5 sm:space-x-3">
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="w-9 h-9 sm:w-10 sm:h-10 object-contain rounded-full border border-blue-900/10 shadow-sm"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+            <div>
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">
+                {language === 'bn' ? settings.institutionName : settings.institutionNameEn}
+              </h1>
+              <p className="text-[11px] sm:text-xs text-amber-700 font-medium">
+                {language === 'bn' ? settings.establishedYear : 'Est: 2016'} • {language === 'bn' ? 'ডিজিটাল ম্যানেজমেন্ট' : 'Digital Portal'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Clock, Language, Super Admin Badge & Profile Capsule [ (avatar)  v ] */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
+          {/* Real-time Clock (Asia/Dhaka) */}
+          <div className="hidden lg:flex items-center text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+            <Clock className="w-3.5 h-3.5 mr-1.5 text-blue-700 animate-pulse" />
+            <span>{timeStr}</span>
+            <span className="ml-1 text-[10px] text-slate-400 font-mono">ঢাকা</span>
+          </div>
+
+          {/* Language Switcher */}
+          <button
+            onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
+            className="hidden sm:flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition"
+            title="Switch Language"
+          >
+            <Globe className="w-3.5 h-3.5 text-blue-600" />
+            <span>{language === 'bn' ? 'English' : 'বাংলা'}</span>
+          </button>
+
+          {/* Notification Center Bell */}
+          <div className="relative" ref={notifRef}>
+            <button
+              type="button"
+              onClick={() => setNotifOpen(!notifOpen)}
+              className="p-2 rounded-full border border-slate-200 hover:bg-slate-50 transition relative text-slate-600 hover:text-blue-600 focus:outline-none"
+              title={language === 'bn' ? 'বিজ্ঞপ্তি ও অনুমোদন কেন্দ্র' : 'Notifications'}
+            >
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-600 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {notifOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 animate-fadeIn">
+                <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-900">
+                    {language === 'bn' ? 'বিজ্ঞপ্তি ও অনুমোদন' : 'Notifications'}
+                  </span>
+                  {unreadCount > 0 && (
+                    <span className="text-[10px] text-amber-600 font-semibold bg-amber-50 px-2 py-0.5 rounded-full">
+                      {unreadCount} {language === 'bn' ? 'টি নতুন' : 'new'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-slate-400 text-xs">
+                      {language === 'bn' ? 'কোনো নতুন বিজ্ঞপ্তি নেই।' : 'No notifications.'}
+                    </div>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => handleMarkAsRead(n)}
+                        className={`p-3 text-xs cursor-pointer hover:bg-slate-50 transition space-y-1 ${
+                          !n.read ? 'bg-blue-50/50' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className={`font-bold ${!n.read ? 'text-blue-900' : 'text-slate-800'}`}>
+                            {n.title}
+                          </span>
+                          {!n.read && <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />}
+                        </div>
+                        <p className="text-[11px] text-slate-600 line-clamp-2">{n.message}</p>
+                        <span className="text-[9px] text-slate-400 block">{new Date(n.createdAt).toLocaleTimeString()}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Role Badge (Super Admin) as shown in image 1 */}
+          {role && (
+            <div className="flex items-center space-x-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-300 rounded-full text-xs font-semibold shadow-xs">
+              <Shield className="w-3.5 h-3.5 text-amber-600" />
+              <span>{role === 'admin' ? 'Super Admin' : (roleLabels[role] || role)}</span>
+            </div>
+          )}
+
+          {/* User Profile Pill: [ (avatar)  v ] as shown in image 2 */}
+          {currentUser && (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center rounded-full border border-slate-200 bg-white hover:bg-slate-50 p-1 pl-1 pr-2.5 sm:pr-3 transition shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 group"
+                title="প্রোফাইল মেনু"
+              >
+                {/* Circular Profile Picture */}
+                <img 
+                  src={avatarUrl} 
+                  alt="Profile" 
+                  referrerPolicy="no-referrer"
+                  className="w-8 h-8 rounded-full border border-slate-200 object-cover shadow-xs shrink-0 bg-slate-100" 
+                  onError={(e) => {
+                    // Fallback to admin avatar if any remote image error occurs
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== window.location.origin + '/admin-avatar.png') {
+                      target.src = '/admin-avatar.png';
+                    }
+                  }}
+                />
+
+                {/* Downward Arrow (ChevronDown) as in image 2 */}
+                <ChevronDown 
+                  className={`w-4 h-4 text-slate-500 ml-1.5 sm:ml-2 transition-transform duration-200 group-hover:text-slate-800 ${
+                    dropdownOpen ? 'rotate-180 text-blue-700' : ''
+                  }`} 
+                />
+              </button>
+
+              {/* Dropdown Menu when clicking the pill */}
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-200 py-2 z-50 animate-fadeIn">
+                  {/* User Profile Details */}
+                  <div className="px-4 py-3 border-b border-slate-100 flex items-center space-x-3 bg-slate-50/70">
+                    <img 
+                      src={avatarUrl} 
+                      alt="Profile" 
+                      referrerPolicy="no-referrer"
+                      className="w-11 h-11 rounded-full border-2 border-white object-cover shadow-sm shrink-0" 
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 truncate">
+                        {currentUser.displayName || (role === 'admin' ? 'প্রধান প্রশাসক (Admin)' : 'ইউজার')}
+                      </p>
+                      <p className="text-[11px] text-slate-500 truncate font-mono mt-0.5">
+                        {currentUser.email || currentUser.phoneNumber || ''}
+                      </p>
+                      <div className="mt-1.5 inline-flex items-center space-x-1 px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-[10px] font-semibold">
+                        <CheckCircle className="w-2.5 h-2.5 text-emerald-600" />
+                        <span>সক্রিয় অ্যাকাউন্ট</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Logout Action */}
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="w-full flex items-center space-x-2.5 px-3 py-2.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl transition group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-red-100 group-hover:bg-red-200 flex items-center justify-center text-red-600 transition">
+                        <LogOut className="w-4 h-4" />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold leading-none">লগআউট (Log Out)</p>
+                        <p className="text-[10px] text-red-400 font-normal mt-0.5">সিস্টেম থেকে বের হন</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+};

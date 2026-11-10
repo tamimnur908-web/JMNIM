@@ -1,0 +1,133 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800 font-bengali min-h-screen selection:bg-blue-200;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Leaflet fix for z-index */
+.leaflet-pane {
+  z-index: 10 !important;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+
+/* Botanical Tree Leaves Breeze Animations */
+@keyframes branchSway {
+  0%, 100% {
+    transform: rotate(0deg) skewX(0deg);
+  }
+  30% {
+    transform: rotate(3deg) skewX(1deg);
+  }
+  70% {
+    transform: rotate(-2.5deg) skewX(-1deg);
+  }
+}
+
+@keyframes branchSwaySlow {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+@keyframes leafFlutter1 {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(4deg) scale(1.03);
+  }
+}
+
+@keyframes leafFlutter2 {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(-5deg) scale(0.98);
+  }
+}
+
+@keyframes gentleDrift {
+  0% {
+    transform: translateY(0px) translateX(0px) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(30px) translateX(15px) rotate(15deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateY(60px) translateX(-10px) rotate(-10deg);
+    opacity: 0.5;
+  }
+}
+
+.animate-branch-sway {
+  transform-origin: top right;
+  animation: branchSway 6s ease-in-out infinite;
+}
+
+.animate-branch-sway-left {
+  transform-origin: top left;
+  animation: branchSway 7s ease-in-out infinite;
+}
+
+.animate-leaf-1 {
+  transform-origin: center;
+  animation: leafFlutter1 3.5s ease-in-out infinite;
+}
+
+.animate-leaf-2 {
+  transform-origin: center;
+  animation: leafFlutter2 4.2s ease-in-out infinite;
+}
+
+.animate-drift {
+  animation: gentleDrift 8s ease-in-out infinite alternate;
+}
+
+/* Print styling */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+  .page-break {
+    page-break-before: always;
+  }
+}
