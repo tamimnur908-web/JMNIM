@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { LocateFixed, ExternalLink, Search, Crosshair } from 'lucide-react';
+import { LocateFixed, ExternalLink, Search, Crosshair, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { formatNumber } from '../utils/formatters';
 
@@ -38,6 +38,7 @@ export const GpsMapPicker: React.FC<GpsMapPickerProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [capturedAccuracy, setCapturedAccuracy] = useState<number | null>(null);
 
   // Initialize Map
   useEffect(() => {
@@ -114,6 +115,7 @@ export const GpsMapPicker: React.FC<GpsMapPickerProps> = ({
       (pos) => {
         const curLat = Number(pos.coords.latitude.toFixed(6));
         const curLng = Number(pos.coords.longitude.toFixed(6));
+        setCapturedAccuracy(Math.round(pos.coords.accuracy));
 
         onChange(curLat, curLng);
         if (mapInstanceRef.current && markerRef.current && circleRef.current) {
@@ -127,7 +129,7 @@ export const GpsMapPicker: React.FC<GpsMapPickerProps> = ({
         alert((isBn ? 'লোকেশন পাওয়া যায়নি: ' : 'Location error: ') + err.message);
         setLocating(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 18000, maximumAge: 0 }
     );
   };
 
@@ -224,6 +226,35 @@ export const GpsMapPicker: React.FC<GpsMapPickerProps> = ({
           </a>
         </div>
       </div>
+
+      {/* Accuracy Feedback Banner for Admin when picking campus center */}
+      {capturedAccuracy !== null && (
+        <div
+          className={`p-2.5 rounded-xl border text-xs flex items-start space-x-2 ${
+            capturedAccuracy <= 100
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              : 'bg-amber-50 border-amber-300 text-amber-900'
+          }`}
+        >
+          <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${capturedAccuracy <= 100 ? 'text-emerald-600' : 'text-amber-600'}`} />
+          <div className="leading-relaxed">
+            <span className="font-bold">
+              {isBn
+                ? `GPS নির্ভুলতা: ±${formatNumber(capturedAccuracy, true)} মিটার। `
+                : `Captured GPS Accuracy: ±${capturedAccuracy}m. `}
+            </span>
+            <span>
+              {capturedAccuracy > 100
+                ? (isBn
+                    ? 'এই রিডিংয়ে অনেক ত্রুটি রয়েছে (সম্ভবত ঘরের ভেতর মোবাইল টাওয়ারের অবস্থান নিয়েছে)। অনুগ্রহ করে ম্যাপটি জুম করে সরাসরি মাদরাসা ভবনের ওপর পিন (📍) টেনে বসিয়ে তারপর সেভ করুন!'
+                    : 'Low precision reading detected. Zoom in on the map and drag the marker pin (📍) directly onto your Madrasa building before saving!')
+                : (isBn
+                    ? 'সঠিক স্যাটেলাইট সিগন্যাল পাওয়া গেছে। চাইলে ম্যাপে পিন সামান্য সমন্বয় করে সংরক্ষণ করতে পারেন।'
+                    : 'Accurate GPS fix captured. You can fine-tune the pin on the map if needed.')}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Map Canvas */}
       <div className="relative rounded-xl overflow-hidden border-2 border-blue-500/30 shadow-md">

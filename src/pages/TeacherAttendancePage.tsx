@@ -89,6 +89,7 @@ export const TeacherAttendancePage: React.FC = () => {
   const requestSeqRef = useRef<number>(0);
   const hasCoordsRef = useRef<boolean>(false);
   const hasGeoErrorRef = useRef<boolean>(false);
+  const bestAccuracyRef = useRef<number | null>(null);
 
   const [todayEvents, setTodayEvents] = useState<TeacherAttendanceEvent[]>([]);
   const [teachersList, setTeachersList] = useState<Teacher[]>([]);
@@ -222,9 +223,10 @@ export const TeacherAttendancePage: React.FC = () => {
     }
   }, []);
 
-  // Request GPS Location with High-Accuracy -> Network/Wi-Fi Fallback & Live Watch
-  const requestLocation = useCallback((clearPreviousError: boolean = true) => {
+  // Request GPS Location with High-Accuracy Priority, Accuracy Guard & Network Fallback
+  const requestLocation = useCallback((clearPreviousError: boolean = true, highAccuracyOnly: boolean = false) => {
     const seq = ++requestSeqRef.current;
+    bestAccuracyRef.current = null;
     setLocating(true);
     if (clearPreviousError) {
       setGeoError(null);
@@ -244,13 +246,28 @@ export const TeacherAttendancePage: React.FC = () => {
 
     const applySuccess = (pos: GeolocationPosition) => {
       if (seq !== requestSeqRef.current) return;
+      const newAcc = Math.round(pos.coords.accuracy);
+
+      // Guard: Never overwrite an accurate satellite GPS lock with a coarse cell-tower reading
+      if (
+        bestAccuracyRef.current !== null &&
+        bestAccuracyRef.current <= 150 &&
+        newAcc > bestAccuracyRef.current * 2
+      ) {
+        setLocating(false);
+        return;
+      }
+
+      bestAccuracyRef.current =
+        bestAccuracyRef.current === null ? newAcc : Math.min(bestAccuracyRef.current, newAcc);
+
       hasCoordsRef.current = true;
       hasGeoErrorRef.current = false;
       setCurrentCoords({
         lat: pos.coords.latitude,
         lng: pos.coords.longitude
       });
-      setAccuracy(Math.round(pos.coords.accuracy));
+      setAccuracy(newAcc);
       setGeoError(null);
       setGeoErrorCode(null);
       setPermissionState('granted');
@@ -260,6 +277,12 @@ export const TeacherAttendancePage: React.FC = () => {
 
     const applyFailure = (err: GeolocationPositionError) => {
       if (seq !== requestSeqRef.current) return;
+      // If background watch already locked coordinates during this request, don't clobber with timeout error
+      if (hasCoordsRef.current && bestAccuracyRef.current !== null && err.code !== err.PERMISSION_DENIED) {
+        setLocating(false);
+        return;
+      }
+
       hasGeoErrorRef.current = true;
       let msg = isBn
         ? "লোকেশন পাওয়া যায়নি। দয়া করে ফোনের Location (GPS) চালু করে আবার চেষ্টা করুন।"
@@ -278,56 +301,64 @@ export const TeacherAttendancePage: React.FC = () => {
           : "GPS / Location signal unavailable. Check that device Location & Location Accuracy are turned ON.";
       } else if (err.code === err.TIMEOUT) {
         setGeoErrorCode('TIMEOUT');
-        msg = isBn
-          ? "নির্ধারিত সময়ের মধ্যে লোকেশন পাওয়া যায়নি। জানালার পাশে বা নেটওয়ার্ক সংযোগসহ আবার চেষ্টা করুন।"
-          : "Location request timed out. Move near a window or check network/GPS and retry.";
+        msg = highAccuracyOnly
+          ? (isBn
+              ? "উচ্চ-নির্ভুল স্যাটেলাইট GPS সিগন্যাল পাওয়া যায়নি (সময় শেষ)। ফোনে Precise Location চালু করে খোলা জায়গায় বা জানালার পাশে চেষ্টা করুন।"
+              : "High-accuracy GPS signal timed out. Ensure Precise Location is ON and retry near an open area/window.")
+          : (isBn
+              ? "নির্ধারিত সময়ের মধ্যে লোকেশন পাওয়া যায়নি। জানালার পাশে বা নেটওয়ার্ক সংযোগসহ আবার চেষ্টা করুন।"
+              : "Location request timed out. Move near a window or check network/GPS and retry.");
       }
       setGeoError(msg);
       setLocating(false);
     };
 
-    // Start/restart background watch so indoors or rough fixes refine automatically
+    // Start/restart background high-accuracy watch (maximumAge: 0) so coarse fixes refine to exact GPS
     stopLocationWatch();
     try {
       watchIdRef.current = navigator.geolocation.watchPosition(
         applySuccess,
         () => {
-          // Errors from single-shot fallback handle user messaging cleanly
+          // Single-shot flow handles fallback and errors
         },
         {
           enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 10000
+          timeout: 30000,
+          maximumAge: 0
         }
       );
     } catch {
       // Ignore watch setup errors and rely on getCurrentPosition below
     }
 
-    // Step 1: Try High Accuracy GPS first (allow up to 15s recent fix so warm GPS locks instantly)
+    // Step 1: Give hardware GPS 18s to acquire an accurate satellite fix before falling back
     navigator.geolocation.getCurrentPosition(
       applySuccess,
       (err) => {
         if (seq !== requestSeqRef.current) return;
-        if (err.code === err.PERMISSION_DENIED) {
+        if (err.code === err.PERMISSION_DENIED || highAccuracyOnly) {
           applyFailure(err);
           return;
         }
-        // Step 2: Automatic fallback to Wi-Fi / Mobile Tower / Network location (works inside buildings)
+        // Step 2: Fallback to Network / Wi-Fi only if watch hasn't locked a fix yet
+        if (bestAccuracyRef.current !== null && bestAccuracyRef.current <= 150) {
+          setLocating(false);
+          return;
+        }
         navigator.geolocation.getCurrentPosition(
           applySuccess,
           applyFailure,
           {
             enableHighAccuracy: false,
             timeout: 15000,
-            maximumAge: 60000
+            maximumAge: 30000
           }
         );
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 15000
+        timeout: highAccuracyOnly ? 20000 : 18000,
+        maximumAge: highAccuracyOnly ? 0 : 5000
       }
     );
   }, [isBn, stopLocationWatch]);
@@ -1176,6 +1207,46 @@ export const TeacherAttendancePage: React.FC = () => {
             <div className="mt-3 text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-x-4 gap-y-1">
               <span>{t.latitudeLabel}: {currentCoords.lat.toFixed(6)}</span>
               <span>{t.longitudeLabel}: {currentCoords.lng.toFixed(6)}</span>
+            </div>
+          )}
+
+          {/* Coarse / Approximate GPS Warning (e.g. ±658m to ±2000m cell-tower or non-precise Android permission) */}
+          {accuracy !== null && accuracy > 150 && !isWithinRadius && (
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 space-y-2">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">
+                    {isBn
+                      ? `সতর্কতা: আপনার ফোন থেকে সুনির্দিষ্ট GPS পাওয়া যায়নি (ত্রুটি ±${formatNumber(accuracy, true)} মি.)`
+                      : `Low GPS Precision Detected (±${accuracy}m inaccuracy)`}
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    {isBn
+                      ? 'এখন মোবাইল টাওয়ার বা আনুমানিক (Approximate) লোকেশন দেখাচ্ছে — তাই সঠিক জায়গায় বসেও দূরত্ব বেশি দেখাতে পারে। ফোনের ব্রাউজার পারমিশনে "Precise / সুনির্দিষ্ট লোকেশন" চালু করুন অথবা জানালার পাশে গিয়ে পুনরায় খুঁজুন। (অ্যাডমিন সেটিংসে মাদরাসার ম্যাপ পিনও সঠিকভাবে বসানো আছে কি না যাচাই করুন।)'
+                      : 'Device is reporting coarse cell-tower/approximate coordinates instead of satellite GPS. Enable "Precise location" in browser/phone permissions or move near an open window and retry.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => requestLocation(true, true)}
+                  disabled={locating}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold flex items-center space-x-1.5 transition disabled:opacity-50"
+                >
+                  <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
+                  <span>{locating ? (isBn ? 'উচ্চ-নির্ভুল GPS খুঁজছে...' : 'Scanning Satellite GPS...') : (isBn ? 'উচ্চ-নির্ভুল GPS আবার খুঁজুন' : 'Force High-Accuracy GPS')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLocationGuideModal(true)}
+                  className="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[11px] font-bold flex items-center space-x-1.5 transition"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>{isBn ? 'Precise Location চালুর নিয়ম' : 'How to Enable Precise Location'}</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
