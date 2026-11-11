@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useSettings } from '../context/SettingsContext';
 import { useAuth } from '../context/AuthContext';
@@ -40,7 +40,10 @@ import {
   ArrowRight,
   Send,
   Eye,
-  Check
+  Check,
+  Settings,
+  Smartphone,
+  Lock
 } from 'lucide-react';
 import { calculateHaversineDistance } from '../utils/geo';
 import { 
@@ -79,6 +82,13 @@ export const TeacherAttendancePage: React.FC = () => {
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [locating, setLocating] = useState<boolean>(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const [geoErrorCode, setGeoErrorCode] = useState<'PERMISSION_DENIED' | 'POSITION_UNAVAILABLE' | 'TIMEOUT' | 'UNSUPPORTED' | null>(null);
+  const [permissionState, setPermissionState] = useState<'granted' | 'prompt' | 'denied' | 'unsupported' | 'unknown'>('unknown');
+  const [showLocationGuideModal, setShowLocationGuideModal] = useState<boolean>(false);
+  const watchIdRef = useRef<number | null>(null);
+  const requestSeqRef = useRef<number>(0);
+  const hasCoordsRef = useRef<boolean>(false);
+  const hasGeoErrorRef = useRef<boolean>(false);
 
   const [todayEvents, setTodayEvents] = useState<TeacherAttendanceEvent[]>([]);
   const [teachersList, setTeachersList] = useState<Teacher[]>([]);
@@ -204,46 +214,163 @@ export const TeacherAttendancePage: React.FC = () => {
     }
   }, [settings]);
 
-  // Request GPS Location
-  const requestLocation = () => {
+  // Clear any active watchPosition helper
+  const stopLocationWatch = useCallback(() => {
+    if (watchIdRef.current !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  }, []);
+
+  // Request GPS Location with High-Accuracy -> Network/Wi-Fi Fallback & Live Watch
+  const requestLocation = useCallback((clearPreviousError: boolean = true) => {
+    const seq = ++requestSeqRef.current;
     setLocating(true);
-    setGeoError(null);
+    if (clearPreviousError) {
+      setGeoError(null);
+      setGeoErrorCode(null);
+      hasGeoErrorRef.current = false;
+    }
     setMessage(null);
 
-    if (!navigator.geolocation) {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setGeoError(isBn ? "আপনার ব্রাউজারে Geolocation সমর্থিত নয়।" : "Geolocation not supported in your browser.");
+      setGeoErrorCode('UNSUPPORTED');
+      hasGeoErrorRef.current = true;
+      setPermissionState('unsupported');
       setLocating(false);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCurrentCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        });
-        setAccuracy(Math.round(pos.coords.accuracy));
-        setLocating(false);
-      },
-      (err) => {
-        let msg = isBn ? "লোকেশন অনুমতি দেওয়া হয়নি বা জিপিএস সংকেত পাওয়া যায়নি।" : "Location permission denied or GPS unavailable.";
-        if (err.code === err.PERMISSION_DENIED) {
-          msg = isBn ? "লোকেশন পারমিশন ব্লক করা আছে। ব্রাউজার সেটিংস থেকে লোকেশন Allow করুন।" : "Location permission blocked. Please enable location access in browser settings.";
+    const applySuccess = (pos: GeolocationPosition) => {
+      if (seq !== requestSeqRef.current) return;
+      hasCoordsRef.current = true;
+      hasGeoErrorRef.current = false;
+      setCurrentCoords({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      });
+      setAccuracy(Math.round(pos.coords.accuracy));
+      setGeoError(null);
+      setGeoErrorCode(null);
+      setPermissionState('granted');
+      setShowLocationGuideModal(false);
+      setLocating(false);
+    };
+
+    const applyFailure = (err: GeolocationPositionError) => {
+      if (seq !== requestSeqRef.current) return;
+      hasGeoErrorRef.current = true;
+      let msg = isBn
+        ? "লোকেশন পাওয়া যায়নি। দয়া করে ফোনের Location (GPS) চালু করে আবার চেষ্টা করুন।"
+        : "Unable to get location. Please turn ON device Location (GPS) and try again.";
+
+      if (err.code === err.PERMISSION_DENIED) {
+        setGeoErrorCode('PERMISSION_DENIED');
+        setPermissionState('denied');
+        msg = isBn
+          ? "লোকেশন পারমিশন বন্ধ করা আছে। ব্রাউজার বা মোবাইলের Settings থেকে Location Allow করুন।"
+          : "Location permission is blocked. Enable Location access in browser or phone settings.";
+      } else if (err.code === err.POSITION_UNAVAILABLE) {
+        setGeoErrorCode('POSITION_UNAVAILABLE');
+        msg = isBn
+          ? "ডিভাইসের GPS / Location সার্ভিস পাওয়া যাচ্ছে না। ফোনের Location ও Google Location Accuracy চালু আছে কি না দেখুন।"
+          : "GPS / Location signal unavailable. Check that device Location & Location Accuracy are turned ON.";
+      } else if (err.code === err.TIMEOUT) {
+        setGeoErrorCode('TIMEOUT');
+        msg = isBn
+          ? "নির্ধারিত সময়ের মধ্যে লোকেশন পাওয়া যায়নি। জানালার পাশে বা নেটওয়ার্ক সংযোগসহ আবার চেষ্টা করুন।"
+          : "Location request timed out. Move near a window or check network/GPS and retry.";
+      }
+      setGeoError(msg);
+      setLocating(false);
+    };
+
+    // Start/restart background watch so indoors or rough fixes refine automatically
+    stopLocationWatch();
+    try {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        applySuccess,
+        () => {
+          // Errors from single-shot fallback handle user messaging cleanly
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 10000
         }
-        setGeoError(msg);
-        setLocating(false);
+      );
+    } catch {
+      // Ignore watch setup errors and rely on getCurrentPosition below
+    }
+
+    // Step 1: Try High Accuracy GPS first (allow up to 15s recent fix so warm GPS locks instantly)
+    navigator.geolocation.getCurrentPosition(
+      applySuccess,
+      (err) => {
+        if (seq !== requestSeqRef.current) return;
+        if (err.code === err.PERMISSION_DENIED) {
+          applyFailure(err);
+          return;
+        }
+        // Step 2: Automatic fallback to Wi-Fi / Mobile Tower / Network location (works inside buildings)
+        navigator.geolocation.getCurrentPosition(
+          applySuccess,
+          applyFailure,
+          {
+            enableHighAccuracy: false,
+            timeout: 15000,
+            maximumAge: 60000
+          }
+        );
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
+        maximumAge: 15000
       }
     );
-  };
+  }, [isBn, stopLocationWatch]);
 
   useEffect(() => {
     requestLocation();
-  }, []);
+
+    let permStatus: PermissionStatus | null = null;
+    if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' as PermissionName })
+        .then((status) => {
+          permStatus = status;
+          setPermissionState(status.state);
+          status.onchange = () => {
+            setPermissionState(status.state);
+            if (status.state === 'granted') {
+              requestLocation(true);
+            }
+          };
+        })
+        .catch(() => {
+          // Permissions API not available on some mobile browsers (e.g. older iOS Safari)
+        });
+    }
+
+    // Auto-retry when returning from mobile Phone Settings or Browser Site Settings
+    const handleReturnToApp = () => {
+      if (document.visibilityState === 'visible' && (!hasCoordsRef.current || hasGeoErrorRef.current)) {
+        requestLocation(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleReturnToApp);
+    window.addEventListener('focus', handleReturnToApp);
+
+    return () => {
+      stopLocationWatch();
+      if (permStatus) permStatus.onchange = null;
+      document.removeEventListener('visibilitychange', handleReturnToApp);
+      window.removeEventListener('focus', handleReturnToApp);
+    };
+  }, [requestLocation, stopLocationWatch]);
 
   const distance = currentCoords ? calculateHaversineDistance(
     currentCoords,
@@ -900,7 +1027,8 @@ export const TeacherAttendancePage: React.FC = () => {
           )}
 
           <button
-            onClick={requestLocation}
+            type="button"
+            onClick={() => requestLocation(true)}
             disabled={locating}
             className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl border border-slate-300 transition"
             title={isBn ? "জিপিএস রিফ্রেশ" : "Refresh GPS"}
@@ -945,17 +1073,39 @@ export const TeacherAttendancePage: React.FC = () => {
       {/* Geofence & Shift Schedule Overview Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Live GPS Coordinates and Geofence */}
-        <div className={`p-4 rounded-2xl border ${isWithinRadius ? 'bg-emerald-50/60 border-emerald-200' : 'bg-rose-50/60 border-rose-200'} md:col-span-2`}>
+        <div
+          className={`p-4 rounded-2xl border md:col-span-2 ${
+            distance === null
+              ? geoError
+                ? 'bg-rose-50/70 border-rose-200'
+                : 'bg-blue-50/60 border-blue-200'
+              : isWithinRadius
+                ? 'bg-emerald-50/60 border-emerald-200'
+                : 'bg-rose-50/60 border-rose-200'
+          }`}
+        >
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                {isWithinRadius ? (
+                {distance === null ? (
+                  geoError ? (
+                    <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                  ) : (
+                    <Navigation className="w-5 h-5 text-blue-600 shrink-0 animate-pulse" />
+                  )
+                ) : isWithinRadius ? (
                   <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
                 ) : (
                   <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
                 )}
                 <h3 className="font-bold text-sm text-slate-900 break-words">
-                  {isWithinRadius ? (isBn ? "মাদরাসা ক্যাম্পাসের ভেতরে অবস্থিত" : "Inside Madrasa Geofence") : (isBn ? "মাদরাসা ক্যাম্পাসের বাইরে অবস্থিত" : "Outside Madrasa Geofence")}
+                  {distance === null
+                    ? geoError
+                      ? (isBn ? "লোকেশন পাওয়া যায়নি / অ্যাক্সেস প্রয়োজন" : "Location Unavailable / Access Needed")
+                      : (isBn ? "আপনার অবস্থান শনাক্ত করা হচ্ছে..." : "Detecting Your Location...")
+                    : isWithinRadius
+                      ? (isBn ? "মাদরাসা ক্যাম্পাসের ভেতরে অবস্থিত" : "Inside Madrasa Geofence")
+                      : (isBn ? "মাদরাসা ক্যাম্পাসের বাইরে অবস্থিত" : "Outside Madrasa Geofence")}
                 </h3>
               </div>
               <p className="text-xs text-slate-600 mt-1 break-words">
@@ -963,23 +1113,62 @@ export const TeacherAttendancePage: React.FC = () => {
                   <>
                     {t.distanceFromMadrasa} <strong className="font-mono text-slate-900">{formatNumber(distance, isBn)} {t.metersUnit}</strong> ({t.allowedRadiusLabel} {formatNumber(settings.allowedRadiusMeters, isBn)} {t.metersUnit})
                   </>
+                ) : geoError ? (
+                  isBn ? 'হাজিরা দেওয়ার জন্য ব্রাউজার ও ফোনের লোকেশন অ্যাক্সেস চালু থাকা প্রয়োজন।' : 'Location access is required for GPS attendance.'
                 ) : (
-                  isBn ? 'লোকেশন লোড হচ্ছে...' : 'Detecting coordinates...'
+                  isBn ? 'GPS ও নেটওয়ার্ক সিগন্যাল থেকে লোকেশন লোড হচ্ছে...' : 'Acquiring GPS & network location...'
                 )}
               </p>
             </div>
 
-            {accuracy !== null && (
-              <span className={`self-start shrink-0 text-[11px] px-2 py-1 rounded-md font-medium border ${accuracy <= 50 ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-white text-amber-700 border-amber-200'}`}>
-                {t.gpsAccuracy}: ±{formatNumber(accuracy, isBn)} {t.accuracyUnit}
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-1.5 self-start shrink-0">
+              {accuracy !== null && (
+                <span className={`text-[11px] px-2 py-1 rounded-md font-medium border ${accuracy <= 50 ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-white text-amber-700 border-amber-200'}`}>
+                  {t.gpsAccuracy}: ±{formatNumber(accuracy, isBn)} {t.accuracyUnit}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => requestLocation(true)}
+                disabled={locating}
+                className="text-[11px] px-2 py-1 rounded-md font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 flex items-center space-x-1 transition disabled:opacity-50"
+                title={isBn ? 'লোকেশন রিফ্রেশ করুন' : 'Refresh GPS'}
+              >
+                <RotateCw className={`w-3 h-3 ${locating ? 'animate-spin text-blue-600' : ''}`} />
+                <span>{locating ? (isBn ? 'খুঁজছে...' : 'Locating...') : (isBn ? 'রিফ্রেশ' : 'Retry')}</span>
+              </button>
+            </div>
           </div>
 
           {geoError && (
-            <div className="mt-3 p-2 bg-rose-100/80 text-rose-800 rounded-lg text-xs flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{geoError}</span>
+            <div className="mt-3 p-3 bg-rose-100/80 text-rose-900 rounded-xl border border-rose-200 text-xs space-y-2.5">
+              <div className="flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+                <span className="leading-relaxed break-words">{geoError}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => requestLocation(true)}
+                  disabled={locating}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold flex items-center space-x-1.5 shadow-xs transition disabled:opacity-50"
+                >
+                  <Navigation className={`w-3.5 h-3.5 ${locating ? 'animate-spin' : ''}`} />
+                  <span>
+                    {permissionState === 'prompt'
+                      ? (isBn ? 'লোকেশন পারমিশন দিন' : 'Allow Location Access')
+                      : (isBn ? 'লোকেশন অ্যাক্সেস / পুনরায় চেষ্টা করুন' : 'Retry Location Access')}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLocationGuideModal(true)}
+                  className="px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-800 border border-rose-300 rounded-lg text-[11px] font-bold flex items-center space-x-1.5 transition"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>{isBn ? 'সেটিংস থেকে চালু করার নিয়ম' : 'Open Settings Guide'}</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -2094,6 +2283,103 @@ export const TeacherAttendancePage: React.FC = () => {
                 </div>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 5: LOCATION ACCESS & MOBILE SETTINGS GUIDE MODAL                    */}
+      {/* ========================================================================= */}
+      {showLocationGuideModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 my-auto animate-scaleUp">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-700 to-indigo-900 text-white flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <Smartphone className="w-5 h-5 text-blue-200 shrink-0" />
+                <h3 className="font-bold text-sm sm:text-base break-words">
+                  {isBn ? "মোবাইল ও ব্রাউজার লোকেশন সেটিংস নির্দেশিকা" : "Mobile & Browser Location Settings"}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocationGuideModal(false)}
+                className="text-white/80 hover:text-white text-lg font-bold shrink-0 p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 sm:p-6 space-y-4 text-xs text-slate-700">
+              {geoErrorCode === 'PERMISSION_DENIED' || permissionState === 'denied' ? (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 font-semibold">
+                  {isBn
+                    ? "আপনার ব্রাউজার এই ওয়েবসাইটের লোকেশন অনুমতি ব্লক করে রেখেছে। নিচের ১ ও ২ নম্বর ধাপ অনুসরণ করে চালু করুন:"
+                    : "Location permission for this website is blocked. Follow Steps 1 & 2 below to allow it:"}
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 font-semibold">
+                  {isBn
+                    ? "লোকেশন চালু থাকা সত্ত্বেও সিগন্যাল না পেলে নিচের ব্রাউজার ও ফোনের সেটিংস দুটি যাচাই করুন:"
+                    : "If GPS is ON but location is still not received, verify both browser and phone settings below:"}
+                </div>
+              )}
+
+              {/* Step 1: Browser Site Permission */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="font-bold text-slate-900 flex items-center space-x-2 text-xs sm:text-sm">
+                  <Lock className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>{isBn ? "ধাপ ১: ব্রাউজারের সাইট পারমিশন (Browser)" : "Step 1: Browser Site Permission"}</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-slate-600 leading-relaxed">
+                  <li>{isBn ? "ব্রাউজারের একদম উপরে URL বারের বাম পাশে তালা (🔒) বা সেটিংস আইকনে ট্যাপ করুন।" : "Tap the Lock (🔒) or Site Settings icon on the left side of the address bar."}</li>
+                  <li>{isBn ? "\"Permissions\" বা \"Site Settings\"-এ প্রবেশ করে \"Location\" চালু (Allow) করুন।" : "Open \"Permissions\" or \"Site Settings\" and set \"Location\" to Allow."}</li>
+                  <li>{isBn ? "যদি \"Use precise location\" অপশন থাকে, সেটিও চালু রাখুন।" : "Enable \"Use precise location\" if available."}</li>
+                </ol>
+              </div>
+
+              {/* Step 2: Mobile Phone System Settings */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <div className="font-bold text-slate-900 flex items-center space-x-2 text-xs sm:text-sm">
+                  <Settings className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{isBn ? "ধাপ ২: ফোনের সেটিংস (Mobile Settings)" : "Step 2: Mobile Phone Settings"}</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1 text-slate-600 leading-relaxed">
+                  <li>{isBn ? "ফোনের Settings → Location চালু করুন এবং Location Accuracy / Google Location Accuracy অন করুন।" : "Open Phone Settings → Location (ON) and enable Location Accuracy."}</li>
+                  <li>{isBn ? "ফোনের Settings → Apps → আপনার ব্রাউজার (যেমন Chrome / Samsung Browser) → Permissions → Location → \"Allow only while using\" এবং \"Use precise location\" চালু করুন।" : "Go to Settings → Apps → your Browser → Permissions → Location → \"Allow only while using\" & Precise."}</li>
+                  <li>{isBn ? "ফোনে Battery Saver চালু থাকলে সাময়িকভাবে বন্ধ রাখুন এবং জানালার পাশে এসে চেষ্টা করুন।" : "Turn off Battery Saver if active and retry near a window if indoors."}</li>
+                </ol>
+              </div>
+
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-[11px] flex items-start space-x-2">
+                <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <span>
+                  {isBn
+                    ? "মোবাইলের Settings থেকে অনুমতি দিয়ে এই ব্রাউজার পেজে ফিরে এলেই স্বয়ংক্রিয়ভাবে লোকেশন যুক্ত হয়ে যাবে। চাইলে নিচের বাটনেও চাপ দিতে পারেন।"
+                    : "Once you return to this tab from phone Settings, location will be detected automatically—or tap the verify button below."}
+                </span>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowLocationGuideModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  {isBn ? "বন্ধ করুন" : "Close"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    requestLocation(true);
+                    setShowLocationGuideModal(false);
+                  }}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center space-x-1.5 shadow-sm"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{isBn ? "সেটিংস চালু করেছি — এখন যাচাই করুন" : "Settings Enabled — Verify Now"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
