@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, getFirestore, Firestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 export const firebaseConfig = {
@@ -22,4 +22,13 @@ setPersistence(auth, browserLocalPersistence).catch((err) => {
   console.warn("Could not set Firebase auth persistence:", err);
 });
 
-export const db = getFirestore(app);
+let dbInstance: Firestore;
+try {
+  dbInstance = initializeFirestore(app, {
+    ignoreUndefinedProperties: true
+  });
+} catch {
+  dbInstance = getFirestore(app);
+}
+
+export const db = dbInstance;

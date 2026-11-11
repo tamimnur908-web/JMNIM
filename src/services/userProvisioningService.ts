@@ -271,7 +271,7 @@ export async function provisionApprovedUser({
       centralReports: teacherManagementSuccess,
       permissions: true
     },
-    errors: errors.length > 0 ? errors : undefined
+    ...(errors.length > 0 ? { errors } : {})
   };
 
   const userDocRef = doc(db, 'users', uid);
@@ -285,12 +285,12 @@ export async function provisionApprovedUser({
     approvalStatus: 'approved',
     role: assignedRole,
     permissions,
-    teacherId: finalTeacherId,
-    teacherDocId: finalTeacherDocId,
-    staffId: finalStaffId,
+    teacherId: finalTeacherId || null,
+    teacherDocId: finalTeacherDocId || null,
+    staffId: finalStaffId || null,
     provisioning: provisioningState,
-    approvedBy: approverUid,
-    approvedByName: approverName,
+    approvedBy: approverUid || '',
+    approvedByName: approverName || 'Admin',
     approvedAt: now,
     updatedAt: now
   }, { merge: true });
