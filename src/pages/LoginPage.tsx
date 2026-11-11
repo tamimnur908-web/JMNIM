@@ -238,7 +238,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-emerald-50/25 flex items-center justify-center p-4 sm:p-6 lg:p-8 font-bengali relative overflow-hidden selection:bg-emerald-100">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-emerald-50/25 flex flex-col items-center justify-center p-3 pt-16 sm:p-6 lg:p-8 font-bengali relative overflow-x-hidden selection:bg-emerald-100">
       {/* Language Switcher in Corner */}
       <div className="absolute top-4 left-4 z-20">
         <div className="flex items-center bg-white/90 backdrop-blur-sm p-1 rounded-xl border border-slate-200 shadow-sm">
@@ -346,19 +346,19 @@ export const LoginPage: React.FC = () => {
             {pageMode === 'login' && (
               <div className="space-y-4">
                 {/* Method Tabs: Email Login vs Mobile Login */}
-                <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
+                <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => {
                       setLoginTab('email');
                       setErrorMsg(null);
                     }}
-                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition ${
+                    className={`w-full py-2 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition ${
                       loginTab === 'email' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>{isBn ? "ইমেইল ও পাসওয়ার্ড" : "Email & Password"}</span>
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{isBn ? "ইমেইল ও পাসওয়ার্ড" : "Email & Password"}</span>
                   </button>
                   <button
                     type="button"
@@ -366,12 +366,12 @@ export const LoginPage: React.FC = () => {
                       setLoginTab('phone');
                       setErrorMsg(null);
                     }}
-                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition ${
+                    className={`w-full py-2 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition ${
                       loginTab === 'phone' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>{isBn ? "মোবাইল ও পাসওয়ার্ড" : "Mobile & Password"}</span>
+                    <Phone className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{isBn ? "মোবাইল ও পাসওয়ার্ড" : "Mobile & Password"}</span>
                   </button>
                 </div>
 
@@ -400,11 +400,11 @@ export const LoginPage: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         {isBn ? "মোবাইল নম্বর" : "Mobile Number"}
                       </label>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <select
                           value={countryCode}
                           onChange={(e) => setCountryCode(e.target.value)}
-                          className="w-32 px-2 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
+                          className="w-full sm:w-32 px-2 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium shrink-0"
                         >
                           {COUNTRY_CODES.map((c) => (
                             <option key={c.code} value={c.code}>
@@ -412,7 +412,7 @@ export const LoginPage: React.FC = () => {
                             </option>
                           ))}
                         </select>
-                        <div className="relative flex-1">
+                        <div className="relative flex-1 min-w-0">
                           <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                           <input
                             type="tel"
@@ -496,19 +496,19 @@ export const LoginPage: React.FC = () => {
             {pageMode === 'register' && (
               <div className="space-y-4">
                 {/* Method Tabs: Register with Email vs Register with Mobile */}
-                <div className="flex rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200 text-xs font-semibold">
                   <button
                     type="button"
                     onClick={() => {
                       setRegisterTab('email');
                       setErrorMsg(null);
                     }}
-                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition ${
+                    className={`w-full py-2 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition ${
                       registerTab === 'email' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>{isBn ? "১. ইমেইল দিয়ে নিবন্ধন" : "1. Register with Email"}</span>
+                    <Mail className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{isBn ? "১. ইমেইল দিয়ে নিবন্ধন" : "1. Register with Email"}</span>
                   </button>
                   <button
                     type="button"
@@ -516,12 +516,12 @@ export const LoginPage: React.FC = () => {
                       setRegisterTab('phone');
                       setErrorMsg(null);
                     }}
-                    className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition ${
+                    className={`w-full py-2 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition ${
                       registerTab === 'phone' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>{isBn ? "২. মোবাইল দিয়ে নিবন্ধন" : "2. Register with Mobile"}</span>
+                    <Phone className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{isBn ? "২. মোবাইল দিয়ে নিবন্ধন" : "2. Register with Mobile"}</span>
                   </button>
                 </div>
 
@@ -568,11 +568,11 @@ export const LoginPage: React.FC = () => {
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         {isBn ? "মোবাইল নম্বর" : "Mobile Number"}
                       </label>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <select
                           value={countryCode}
                           onChange={(e) => setCountryCode(e.target.value)}
-                          className="w-32 px-2 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium"
+                          className="w-full sm:w-32 px-2 py-2 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:ring-2 focus:ring-blue-600 focus:outline-none font-medium shrink-0"
                         >
                           {COUNTRY_CODES.map((c) => (
                             <option key={c.code} value={c.code}>
@@ -580,7 +580,7 @@ export const LoginPage: React.FC = () => {
                             </option>
                           ))}
                         </select>
-                        <div className="relative flex-1">
+                        <div className="relative flex-1 min-w-0">
                           <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                           <input
                             type="tel"

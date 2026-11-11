@@ -704,14 +704,14 @@ export const TeacherManagementPage: React.FC = () => {
       {/* MODAL: ADD TEACHER (TWO DISTINCT METHODS)                                  */}
       {/* ========================================================================= */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b pb-3">
-              <div>
+            <div className="flex items-start sm:items-center justify-between gap-2 border-b pb-3">
+              <div className="min-w-0">
                 <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                  <UserPlus className="w-5 h-5 text-blue-600" />
-                  <span>
+                  <UserPlus className="w-5 h-5 text-blue-600 shrink-0" />
+                  <span className="break-words">
                     {addStep === 'select_method' && t.addTeacherSelectMethodTitle}
                     {addStep === 'search_account' && t.addTeacherMethodRegisteredTitle}
                     {addStep === 'form_linked' && (isBn ? 'নিবন্ধিত অ্যাকাউন্ট দিয়ে শিক্ষক যোগ করুন' : 'Add Teacher with Registered Account')}
@@ -950,18 +950,18 @@ export const TeacherManagementPage: React.FC = () => {
             {addStep === 'form_linked' && selectedUserToLink && (
               <form onSubmit={handleSubmitLinkedTeacher} className="space-y-3 text-xs">
                 {/* Linked Account Indicator Capsule */}
-                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                  <div>
+                <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="min-w-0">
                     <span className="text-[10px] text-blue-600 font-bold block">{isBn ? 'সংযুক্ত অ্যাকাউন্ট:' : 'Linked Account:'}</span>
-                    <span className="font-bold text-slate-900">{selectedUserToLink.displayName}</span>
-                    <span className="text-[11px] text-slate-500 block">{selectedUserToLink.email || selectedUserToLink.phoneNumber}</span>
+                    <span className="font-bold text-slate-900 break-words">{selectedUserToLink.displayName}</span>
+                    <span className="text-[11px] text-slate-500 block break-all">{selectedUserToLink.email || selectedUserToLink.phoneNumber}</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">
+                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold shrink-0 self-start sm:self-center">
                     UID: {selectedUserToLink.uid.slice(0, 8)}...
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{t.teacherId} *</label>
                     <input
@@ -995,7 +995,7 @@ export const TeacherManagementPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{t.designation} *</label>
                     <input
@@ -1017,7 +1017,7 @@ export const TeacherManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{isBn ? 'মোবাইল ফোন' : 'Phone'}</label>
                     <input
@@ -1038,7 +1038,7 @@ export const TeacherManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{isBn ? 'যোগদানের তারিখ' : 'Joining Date'}</label>
                     <input
@@ -1102,7 +1102,7 @@ export const TeacherManagementPage: React.FC = () => {
                     : 'This creates only a teacher record without a login account. Can later be linked to an online account if needed.'}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{t.teacherId} *</label>
                     <input
@@ -1137,7 +1137,7 @@ export const TeacherManagementPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{t.designation} *</label>
                     <input
@@ -1159,7 +1159,7 @@ export const TeacherManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">
                       {isBn ? 'মোবাইল ফোন (ঐচ্ছিক)' : 'Phone (Optional)'}
@@ -1186,7 +1186,7 @@ export const TeacherManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">{isBn ? 'যোগদানের তারিখ' : 'Joining Date'}</label>
                     <input
@@ -1355,8 +1355,8 @@ export const TeacherManagementPage: React.FC = () => {
       {/* ========================================================================= */}
       {viewingTeacher && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'শিক্ষক প্রোফাইল বিবরণ' : 'Teacher Profile'}</h3>
               <button onClick={() => setViewingTeacher(null)} className="text-slate-400">✕</button>
             </div>
@@ -1432,8 +1432,8 @@ export const TeacherManagementPage: React.FC = () => {
       {/* ========================================================================= */}
       {editingTeacher && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'শিক্ষক তথ্য সম্পাদনা' : 'Edit Teacher'}</h3>
               <button onClick={() => setEditingTeacher(null)} className="text-slate-400">✕</button>
             </div>
@@ -1450,7 +1450,7 @@ export const TeacherManagementPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{t.designation} *</label>
                   <input
@@ -1472,7 +1472,7 @@ export const TeacherManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'মোবাইল ফোন' : 'Phone'}</label>
                   <input
@@ -1493,7 +1493,7 @@ export const TeacherManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{t.baseSalaryTaka} *</label>
                   <input

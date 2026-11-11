@@ -438,9 +438,9 @@ export const FeeManagementPage: React.FC = () => {
 
       {/* Collect Fee Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                 <Receipt className="w-4 h-4 text-blue-600" />
                 <span>{isBn ? 'নতুন ফি আদায় রসিদ' : 'New Fee Collection Receipt'}</span>
@@ -466,7 +466,7 @@ export const FeeManagementPage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'ফি এর খাত' : 'Fee Type'}</label>
                   <input
@@ -488,7 +488,7 @@ export const FeeManagementPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'মোট ফি (৳)' : 'Fee Amount'}</label>
                   <input
@@ -527,7 +527,7 @@ export const FeeManagementPage: React.FC = () => {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'পরিশোধের মাধ্যম' : 'Payment Method'}</label>
                   <select
@@ -575,8 +575,8 @@ export const FeeManagementPage: React.FC = () => {
 
       {/* Printable Receipt Modal */}
       {selectedReceipt && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 print:static print:bg-transparent print:p-0">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:shadow-none p-5 sm:p-6 print:p-0 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3 no-print">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'মানি রসিদ' : 'Money Receipt'}</h3>
               <div className="flex space-x-2">
@@ -652,7 +652,7 @@ export const FeeManagementPage: React.FC = () => {
                 </tbody>
               </table>
 
-              <div className="pt-8 flex items-end justify-between text-slate-500 text-[10px]">
+              <div className="pt-8 flex flex-wrap items-end justify-between gap-4 text-slate-500 text-[10px]">
                 <div className="border-t border-slate-400 w-28 text-center pt-1">
                   {isBn ? 'অভিভাবকের স্বাক্ষর' : 'Payer Signature'}
                 </div>

@@ -855,17 +855,17 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
 
       {/* MODAL 1: Student Detail View */}
       {isDetailModalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">
                 {isBn ? 'শিক্ষার্থীর পূর্ণাঙ্গ প্রোফাইল' : 'Student Full Profile'}
               </h3>
-              <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-600 shrink-0 p-1">✕</button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl">
                 <div>
                   <span className="text-slate-500 block">{isBn ? 'শিক্ষার্থী আইডি' : 'Student ID'}:</span>
                   <span className="font-bold text-blue-700 text-sm">{selectedStudent.studentId}</span>
@@ -922,13 +922,13 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
 
       {/* MODAL 2: Super Admin Direct Edit Modal */}
       {isEditModalOpen && selectedStudent && isSuperAdmin && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">
                 {isBn ? 'শিক্ষার্থী সম্পাদনা (Super Admin Direct Edit)' : 'Super Admin Direct Edit'}
               </h3>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 shrink-0 p-1">✕</button>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -942,7 +942,7 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">{isBn ? 'জামাত / শ্রেণি' : 'Class'}</label>
                   <select
@@ -966,7 +966,7 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">{isBn ? 'আবাসিক ধরন' : 'Category'}</label>
                   <select
@@ -990,7 +990,7 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-700 font-semibold mb-1">{isBn ? 'অভিভাবকের নাম' : 'Guardian Name'}</label>
                   <input
@@ -1034,18 +1034,18 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
 
       {/* MODAL 3: Non-Super Admin Approval Request Modal (Requirement 5) */}
       {isRequestModalOpen && selectedStudent && !isSuperAdmin && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center space-x-2">
-                <Send className="w-5 h-5 text-amber-600" />
-                <h3 className="text-base font-bold text-slate-900">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-start sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center space-x-2 min-w-0">
+                <Send className="w-5 h-5 text-amber-600 shrink-0" />
+                <h3 className="text-base font-bold text-slate-900 break-words">
                   {requestType === 'edit' 
                     ? (isBn ? 'সম্পাদনা অনুমোদন আবেদন (Submit to Super Admin)' : 'Submit Edit Request')
                     : (isBn ? 'মুছে ফেলার অনুমোদন আবেদন (Submit to Super Admin)' : 'Submit Delete Request')}
                 </h3>
               </div>
-              <button onClick={() => setIsRequestModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => setIsRequestModalOpen(false)} className="text-slate-400 hover:text-slate-600 shrink-0 p-1">✕</button>
             </div>
 
             <div className="p-3 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-xs space-y-1">
@@ -1125,8 +1125,8 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
 
       {/* MODAL 4: Super Admin Delete & Archive Protection Dialog (Requirement 6) */}
       {isDeleteDialogOpen && studentToDelete && isSuperAdmin && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 border-2 border-red-500">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4 border-2 border-red-500">
             <div className="flex items-center space-x-3 text-red-600 border-b border-red-100 pb-3">
               <AlertTriangle className="w-6 h-6 shrink-0" />
               <div>
@@ -1160,7 +1160,7 @@ export const StudentManagementPage: React.FC<{ onNavigateToAdmission?: () => voi
                 {isBn ? 'পদক্ষেপের ধরন নির্বাচন করুন:' : 'Select Action Type:'}
               </label>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setDeleteMode('archive')}

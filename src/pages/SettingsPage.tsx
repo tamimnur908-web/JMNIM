@@ -379,52 +379,52 @@ export const SettingsPage: React.FC = () => {
       )}
 
       {/* Settings Navigation Tabs */}
-      <div className="flex items-center space-x-2 border-b border-slate-200">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar">
         <button
           onClick={() => setActiveTab('profile')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 ${
+          className={`px-3 sm:px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 whitespace-nowrap shrink-0 ${
             activeTab === 'profile'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Building className="w-4 h-4" />
+          <Building className="w-4 h-4 shrink-0" />
           <span>{isBn ? 'মাদরাসা পরিচিতি ও জিপিএস জিওফেন্স' : 'Profile & GPS Geofence'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('fees')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 ${
+          className={`px-3 sm:px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 whitespace-nowrap shrink-0 ${
             activeTab === 'fees'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Receipt className="w-4 h-4" />
+          <Receipt className="w-4 h-4 shrink-0" />
           <span>{isBn ? 'ডিফল্ট মাসিক ফি পলিসি' : 'Default Fee Policy'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('classes')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 ${
+          className={`px-3 sm:px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 whitespace-nowrap shrink-0 ${
             activeTab === 'classes'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Layers className="w-4 h-4" />
+          <Layers className="w-4 h-4 shrink-0" />
           <span>{isBn ? 'শ্রেণি ও শাখা ব্যবস্থাপনা' : 'Classes & Sections'}</span>
         </button>
 
         <button
           onClick={() => setActiveTab('signatory')}
-          className={`px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 ${
+          className={`px-3 sm:px-4 py-2.5 text-xs font-bold border-b-2 transition flex items-center space-x-1.5 whitespace-nowrap shrink-0 ${
             activeTab === 'signatory'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <PenTool className="w-4 h-4" />
+          <PenTool className="w-4 h-4 shrink-0" />
           <span>{isBn ? 'মুহতামিমের স্বাক্ষর ও সিল' : 'Authority Signature & Seal'}</span>
         </button>
       </div>
@@ -901,7 +901,7 @@ export const SettingsPage: React.FC = () => {
                 <span className="font-bold text-[11px] text-slate-700 block mb-2">
                   {isBn ? 'শ্রেণিভিত্তিক ডিফল্ট মাসিক ফি (Method B এর জন্য প্রযোজ্য):' : 'Class-wise Default Rates (For Method B):'}
                 </span>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[10px] text-slate-500">আবাসিক (৳)</label>
                     <input
@@ -1055,8 +1055,8 @@ export const SettingsPage: React.FC = () => {
           {/* Edit Class Modal */}
           {editingClass && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-                <div className="flex items-center justify-between border-b pb-3">
+              <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between gap-2 border-b pb-3">
                   <h3 className="text-base font-bold text-slate-900">{isBn ? 'শ্রেণি সম্পাদনা' : 'Edit Class'}</h3>
                   <button onClick={() => setEditingClass(null)} className="text-slate-400">✕</button>
                 </div>
@@ -1085,7 +1085,7 @@ export const SettingsPage: React.FC = () => {
 
                   <div className="p-3 bg-slate-50 rounded-lg space-y-2">
                     <span className="font-bold block text-slate-700">{isBn ? 'শ্রেণিভিত্তিক ডিফল্ট ফি (Method B):' : 'Fees:'}</span>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div>
                         <label className="block text-[10px]">আবাসিক</label>
                         <input
@@ -1230,7 +1230,7 @@ export const SettingsPage: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 mb-2">
                 {isBn ? 'স্বাক্ষর প্রদানের মাধ্যম নির্বাচন করুন:' : 'Select Signature Input Method:'}
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setSignatureType('drawn')}

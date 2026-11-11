@@ -1163,8 +1163,8 @@ export const TeacherSalaryPage: React.FC = () => {
           SECTION C: PAY TEACHER SALARY MODAL (Admin Execution)
           ========================================================================= */}
       {isPayModalOpen && selectedTeacher && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 my-auto animate-fadeIn">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4 my-auto animate-fadeIn">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
                 <Wallet className="w-4 h-4 text-blue-600" />
@@ -1182,10 +1182,10 @@ export const TeacherSalaryPage: React.FC = () => {
               
               {/* Teacher Info & Selectable Month Field */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
                     <span className="text-slate-400 block text-[10px]">{isBn ? 'শিক্ষকের নাম ও আইডি:' : 'Teacher:'}</span>
-                    <p className="font-bold text-slate-900 text-sm">
+                    <p className="font-bold text-slate-900 text-sm break-words">
                       {selectedTeacher.fullName} 
                       <span className="text-blue-600 font-mono text-xs ml-1">({selectedTeacher.teacherId})</span>
                     </p>
@@ -1195,7 +1195,7 @@ export const TeacherSalaryPage: React.FC = () => {
                   </div>
 
                   {/* Month Picker Field */}
-                  <div className="text-right">
+                  <div className="text-left sm:text-right shrink-0">
                     <label className="block text-[10px] font-bold text-slate-700 mb-1">
                       {isBn ? 'বেতনের মাস নির্বাচন করুন:' : 'Select Salary Month:'}
                     </label>
@@ -1231,7 +1231,7 @@ export const TeacherSalaryPage: React.FC = () => {
               </div>
 
               {/* Salary Breakdown Inputs */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700">{isBn ? 'মূল বেতন (৳)' : 'Base Salary (BDT)'}</label>
                   <input
@@ -1253,7 +1253,7 @@ export const TeacherSalaryPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700">{isBn ? 'বোনাস ৳' : 'Bonus (BDT)'}</label>
                   <input
@@ -1284,7 +1284,7 @@ export const TeacherSalaryPage: React.FC = () => {
               </div>
 
               {/* Net Payable Highlight */}
-              <div className="p-3 bg-emerald-50 text-emerald-950 border border-emerald-300 rounded-xl flex items-center justify-between shadow-2xs">
+              <div className="p-3 bg-emerald-50 text-emerald-950 border border-emerald-300 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
                 <div>
                   <span className="font-bold text-xs block">{isBn ? 'সর্বমোট প্রদেয় নিট বেতন:' : 'Net Payable Salary:'}</span>
                   <span className="text-[10px] text-emerald-700 font-medium">
@@ -1295,7 +1295,7 @@ export const TeacherSalaryPage: React.FC = () => {
               </div>
 
               {/* Payment Method & Remarks */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1 text-slate-700">{isBn ? 'পরিশোধ মাধ্যম' : 'Payment Method'}</label>
                   <select

@@ -175,7 +175,7 @@ export const TeacherAcknowledgmentModal: React.FC<TeacherAcknowledgmentModalProp
 
         {/* Read-Only Salary Breakdown Card */}
         <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
-          <div className="grid grid-cols-2 gap-2 text-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
             <div>
               <span className="text-slate-400 block text-[10px]">{isBn ? 'শিক্ষক:' : 'Teacher:'}</span>
               <span className="font-bold text-slate-900">{teacherName}</span>
@@ -195,7 +195,7 @@ export const TeacherAcknowledgmentModal: React.FC<TeacherAcknowledgmentModalProp
             </div>
           </div>
 
-          <div className="border-t border-slate-200 pt-2 grid grid-cols-3 gap-2 text-[11px]">
+          <div className="border-t border-slate-200 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
             <div className="bg-white p-2 rounded-lg border border-slate-100">
               <span className="text-slate-400 block">{isBn ? 'মূল বেতন:' : 'Base Salary:'}</span>
               <span className="font-bold text-slate-900">{formatBDT(payment.baseSalary, isBn)}</span>
@@ -210,7 +210,7 @@ export const TeacherAcknowledgmentModal: React.FC<TeacherAcknowledgmentModalProp
             </div>
           </div>
 
-          <div className="p-3 bg-emerald-50 text-emerald-950 border border-emerald-300 rounded-xl flex items-center justify-between">
+          <div className="p-3 bg-emerald-50 text-emerald-950 border border-emerald-300 rounded-xl flex flex-wrap items-center justify-between gap-2">
             <div>
               <span className="text-xs font-bold block">{isBn ? 'প্রদেয় / পরিশোধিত নিট বেতন:' : 'Net Payable Amount:'}</span>
               <span className="text-[10px] text-emerald-700 font-mono">ভাউচার: {payment.voucherNumber}</span>

@@ -945,14 +945,14 @@ export const UserApprovalsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
-              <h3 className="font-bold text-xs sm:text-sm text-slate-800">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center space-x-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0"></span>
+              <h3 className="font-bold text-xs sm:text-sm text-slate-800 break-words">
                 {isBn ? "অনুমোদনের অপেক্ষায় থাকা নতুন আবেদনসমূহ" : "Pending User Registrations Awaiting Approval"}
               </h3>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center justify-between sm:justify-end space-x-3 shrink-0">
               <span className="text-xs text-slate-500 font-semibold">
                 {isBn ? `মোট : ${pendingRequests.length} টি আবেদন` : `Total: ${pendingRequests.length} requests`}
               </span>
@@ -1484,22 +1484,22 @@ export const UserApprovalsPage: React.FC = () => {
               const isDelegated = isOwnerUser || (settings.approverUids || []).includes(adminUser.uid);
 
               return (
-                <div key={adminUser.uid} className="py-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-xs sm:text-sm text-slate-900 flex items-center space-x-2">
-                      <span>{adminUser.displayName}</span>
-                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">
+                <div key={adminUser.uid} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-bold text-xs sm:text-sm text-slate-900 flex flex-wrap items-center gap-2">
+                      <span className="break-words">{adminUser.displayName}</span>
+                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase shrink-0">
                         {adminUser.role}
                       </span>
                     </div>
-                    <div className="text-xs text-slate-500">{adminUser.email || adminUser.phoneNumber}</div>
+                    <div className="text-xs text-slate-500 break-all">{adminUser.email || adminUser.phoneNumber}</div>
                   </div>
 
                   <button
                     type="button"
                     disabled={isOwnerUser}
                     onClick={() => toggleApproverAuthority(adminUser.uid)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    className={`w-full sm:w-auto shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                       isDelegated
                         ? 'bg-emerald-600 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -1526,19 +1526,19 @@ export const UserApprovalsPage: React.FC = () => {
           <div className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto animate-scaleUp">
             
             {/* Modal Header */}
-            <div className="p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-center justify-between">
-              <div>
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-blue-950 text-white flex items-start sm:items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h3 className="font-bold text-sm sm:text-base flex items-center space-x-2">
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                  <span>{isBn ? "ইউজার অনুমোদন ও পারমিশন অ্যাসাইন" : "Review User & Assign Permissions"}</span>
+                  <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span className="break-words">{isBn ? "ইউজার অনুমোদন ও পারমিশন অ্যাসাইন" : "Review User & Assign Permissions"}</span>
                 </h3>
-                <p className="text-xs text-slate-300 mt-0.5">
+                <p className="text-xs text-slate-300 mt-0.5 break-all">
                   {selectedUser.displayName} • {selectedUser.email || selectedUser.phoneNumber || 'User'}
                 </p>
               </div>
               <button 
                 onClick={() => setSelectedUser(null)} 
-                className="text-slate-400 hover:text-white text-lg font-bold p-1"
+                className="text-slate-400 hover:text-white text-lg font-bold p-1 shrink-0"
               >
                 ✕
               </button>
@@ -1668,13 +1668,13 @@ export const UserApprovalsPage: React.FC = () => {
                               if (!t) return null;
                               return (
                                 <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-xs space-y-1.5 text-xs animate-fadeIn">
-                                  <div className="flex items-center justify-between border-b pb-1">
-                                    <span className="font-bold text-slate-900">{t.fullName}</span>
-                                    <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[10px]">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-1">
+                                    <span className="font-bold text-slate-900 break-words">{t.fullName}</span>
+                                    <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[10px] shrink-0">
                                       ID: {t.teacherId}
                                     </span>
                                   </div>
-                                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600 pt-1">
                                     <div><b>পদবী:</b> {t.designation || '—'}</div>
                                     <div><b>বিভাগ:</b> {t.department || '—'}</div>
                                     <div><b>মোবাইল:</b> {t.phone || '—'}</div>
@@ -1844,20 +1844,20 @@ export const UserApprovalsPage: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2.5">
               <button
                 type="button"
                 onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition"
+                className="w-full sm:w-auto px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition text-center"
               >
                 {isBn ? "বাতিল" : "Cancel"}
               </button>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button
                   type="button"
                   onClick={() => openRejectModal(selectedUser)}
-                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition"
+                  className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition text-center"
                 >
                   {isBn ? "প্রত্যাখ্যান করুন" : "Reject"}
                 </button>
@@ -1866,9 +1866,9 @@ export const UserApprovalsPage: React.FC = () => {
                   type="button"
                   disabled={saving}
                   onClick={handleApprove}
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center space-x-1.5 disabled:opacity-50"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition flex items-center justify-center space-x-1.5 disabled:opacity-50"
                 >
-                  <UserCheck className="w-4 h-4" />
+                  <UserCheck className="w-4 h-4 shrink-0" />
                   <span>{saving ? (isBn ? "সংরক্ষণ হচ্ছে..." : "Saving...") : (isBn ? "অনুমোদন ও পারমিশন নিশ্চিত করুন" : "Confirm Approval & Permissions")}</span>
                 </button>
               </div>

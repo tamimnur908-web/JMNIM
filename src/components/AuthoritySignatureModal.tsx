@@ -253,7 +253,7 @@ export const AuthoritySignatureModal: React.FC<AuthoritySignatureModalProps> = (
             <label className="block text-[11px] font-bold text-slate-700 mb-2">
               {isBn ? 'স্বাক্ষরের মাধ্যম নির্বাচন করুন:' : 'Select Signature Input Method:'}
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setSignatureType('drawn')}

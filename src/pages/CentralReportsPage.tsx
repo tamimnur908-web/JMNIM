@@ -239,17 +239,18 @@ export const CentralReportsPage: React.FC = () => {
 
           {/* Class-wise Breakdown Table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
               <h3 className="font-bold text-xs text-slate-800">{isBn ? 'শ্রেণিভিত্তিক শিক্ষার্থী ও ফি প্রাক্কলন' : 'Class-wise Demographics & Fee Projection'}</h3>
               <button
                 onClick={handleExportStudents}
-                className="flex items-center space-x-1 px-3 py-1 bg-emerald-600 text-white rounded text-xs font-semibold no-print"
+                className="flex items-center space-x-1 px-3 py-1 bg-emerald-600 text-white rounded text-xs font-semibold no-print shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>{isBn ? 'এক্সেল ডাউনলোড' : 'Download'}</span>
               </button>
             </div>
 
+            <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
@@ -294,6 +295,7 @@ export const CentralReportsPage: React.FC = () => {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
         </div>
       )}

@@ -39,7 +39,7 @@ export const PendingApprovalPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-amber-50/30 flex items-center justify-center p-4 sm:p-6 lg:p-8 font-bengali relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-white via-slate-50 to-amber-50/30 flex flex-col items-center justify-center p-3 pt-16 sm:p-6 lg:p-8 font-bengali relative overflow-x-hidden">
       {/* Language Switcher */}
       <div className="absolute top-4 left-4 z-20">
         <div className="flex items-center bg-white/90 backdrop-blur-sm p-1 rounded-xl border border-slate-200 shadow-sm">
@@ -221,14 +221,14 @@ export const PendingApprovalPage: React.FC = () => {
           )}
 
           {/* Action Buttons: Refresh & Logout */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               type="button"
               onClick={handleRefresh}
               disabled={refreshing}
               className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${refreshing ? 'animate-spin text-blue-600' : ''}`} />
               <span>{isBn ? "স্ট্যাটাস রিফ্রেশ" : "Refresh Status"}</span>
             </button>
 
@@ -237,16 +237,16 @@ export const PendingApprovalPage: React.FC = () => {
               onClick={() => logout()}
               className="w-full flex items-center justify-center space-x-2 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-xs font-bold transition"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
               <span>{isBn ? "লগআউট" : "Logout"}</span>
             </button>
           </div>
         </div>
 
         {/* Security Notice */}
-        <div className="text-center mt-6 text-slate-400 text-[11px] flex items-center justify-center space-x-1.5">
-          <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-          <span>
+        <div className="text-center mt-6 text-slate-400 text-[11px] flex items-start sm:items-center justify-center gap-1.5 px-2">
+          <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+          <span className="break-words">
             {isBn 
               ? "মাদরাসার তথ্য ও ডাটাবেজ সুরক্ষার্থে অনুমোদনের পরেই কেবল অ্যাক্সেস প্রদান করা হয়।" 
               : "Strict authorization required to access madrasa administrative data."}

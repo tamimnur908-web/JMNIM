@@ -103,18 +103,18 @@ export const DashboardPage: React.FC<{ onNavigate: (page: string) => void }> = (
     <div className="space-y-6">
       {/* Super Admin Pending Approval Banner (Requirement 5) */}
       {isSuperAdmin && pendingApprovalsCount > 0 && (
-        <div className="p-4 bg-amber-500 text-white rounded-2xl shadow-md flex items-center justify-between animate-fadeIn">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold">
+        <div className="p-4 bg-amber-500 text-white rounded-2xl shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold shrink-0">
               <ShieldAlert className="w-6 h-6" />
             </div>
-            <div>
-              <h4 className="font-bold text-sm">
+            <div className="min-w-0">
+              <h4 className="font-bold text-sm leading-snug break-words">
                 {isBn 
                   ? `${pendingApprovalsCount} টি শিক্ষার্থী পরিবর্তন/ডিলিট অনুমোদন অপেক্ষমাণ!` 
                   : `${pendingApprovalsCount} Student Edit/Delete Approval Requests Pending!`}
               </h4>
-              <p className="text-xs text-amber-100">
+              <p className="text-xs text-amber-100 leading-relaxed break-words">
                 {isBn ? 'অন্যান্য কর্মীদের জমাকৃত অনুরোধ পর্যালোচনা করে অনুমোদন বা বাতিল করুন।' : 'Review pending change requests submitted by staff.'}
               </p>
             </div>
@@ -122,7 +122,7 @@ export const DashboardPage: React.FC<{ onNavigate: (page: string) => void }> = (
 
           <button
             onClick={() => onNavigate('students')}
-            className="px-4 py-2 bg-white text-amber-900 rounded-xl text-xs font-bold hover:bg-amber-50 shadow-sm transition"
+            className="w-full sm:w-auto shrink-0 px-4 py-2 bg-white text-amber-900 rounded-xl text-xs font-bold hover:bg-amber-50 shadow-sm transition text-center"
           >
             {isBn ? 'পর্যালোচনা করুন →' : 'Review Requests →'}
           </button>
@@ -223,34 +223,34 @@ export const DashboardPage: React.FC<{ onNavigate: (page: string) => void }> = (
         <h3 className="text-sm font-semibold text-slate-800 mb-3 flex items-center space-x-2">
           <span>{t.quickActions}</span>
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <button 
             onClick={() => onNavigate('admissions')}
-            className="flex items-center justify-between p-3 bg-blue-50/70 hover:bg-blue-100/70 text-blue-900 rounded-lg text-xs font-medium border border-blue-100 transition"
+            className="flex items-center justify-between gap-2 min-w-0 p-3 bg-blue-50/70 hover:bg-blue-100/70 text-blue-900 rounded-lg text-xs font-medium border border-blue-100 transition text-left"
           >
-            <span>{isBn ? 'নতুন ভর্তি' : 'New Admission'}</span>
-            <ArrowUpRight className="w-4 h-4 text-blue-600" />
+            <span className="truncate">{isBn ? 'নতুন ভর্তি' : 'New Admission'}</span>
+            <ArrowUpRight className="w-4 h-4 text-blue-600 shrink-0" />
           </button>
           <button 
             onClick={() => onNavigate('feeManagement')}
-            className="flex items-center justify-between p-3 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-900 rounded-lg text-xs font-medium border border-emerald-100 transition"
+            className="flex items-center justify-between gap-2 min-w-0 p-3 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-900 rounded-lg text-xs font-medium border border-emerald-100 transition text-left"
           >
-            <span>{isBn ? 'ফি কালেকশন' : 'Fee Collection'}</span>
-            <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+            <span className="truncate">{isBn ? 'ফি কালেকশন' : 'Fee Collection'}</span>
+            <ArrowUpRight className="w-4 h-4 text-emerald-600 shrink-0" />
           </button>
           <button 
             onClick={() => onNavigate('studentAttendance')}
-            className="flex items-center justify-between p-3 bg-purple-50/70 hover:bg-purple-100/70 text-purple-900 rounded-lg text-xs font-medium border border-purple-100 transition"
+            className="flex items-center justify-between gap-2 min-w-0 p-3 bg-purple-50/70 hover:bg-purple-100/70 text-purple-900 rounded-lg text-xs font-medium border border-purple-100 transition text-left"
           >
-            <span>{isBn ? 'শিক্ষার্থী হাজিরা' : 'Student Attendance'}</span>
-            <ArrowUpRight className="w-4 h-4 text-purple-600" />
+            <span className="truncate">{isBn ? 'শিক্ষার্থী হাজিরা' : 'Student Attendance'}</span>
+            <ArrowUpRight className="w-4 h-4 text-purple-600 shrink-0" />
           </button>
           <button 
             onClick={() => onNavigate('accounts')}
-            className="flex items-center justify-between p-3 bg-amber-50/70 hover:bg-amber-100/70 text-amber-900 rounded-lg text-xs font-medium border border-amber-100 transition"
+            className="flex items-center justify-between gap-2 min-w-0 p-3 bg-amber-50/70 hover:bg-amber-100/70 text-amber-900 rounded-lg text-xs font-medium border border-amber-100 transition text-left"
           >
-            <span>{isBn ? 'ক্যাশ বহি' : 'Cashbook'}</span>
-            <ArrowUpRight className="w-4 h-4 text-amber-600" />
+            <span className="truncate">{isBn ? 'ক্যাশ বহি' : 'Cashbook'}</span>
+            <ArrowUpRight className="w-4 h-4 text-amber-600 shrink-0" />
           </button>
         </div>
       </div>
@@ -258,15 +258,15 @@ export const DashboardPage: React.FC<{ onNavigate: (page: string) => void }> = (
       {/* Notices & Institutional Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Notice Board */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2">
-              <Bell className="w-4 h-4 text-blue-600" />
-              <span>{t.notices}</span>
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2 min-w-0">
+              <Bell className="w-4 h-4 text-blue-600 shrink-0" />
+              <span className="truncate">{t.notices}</span>
             </h3>
             <button 
               onClick={() => onNavigate('notices')} 
-              className="text-xs text-blue-600 hover:underline font-medium"
+              className="text-xs text-blue-600 hover:underline font-medium shrink-0"
             >
               {t.all}
             </button>
@@ -279,9 +279,9 @@ export const DashboardPage: React.FC<{ onNavigate: (page: string) => void }> = (
           ) : (
             <div className="space-y-3">
               {recentNotices.map((n) => (
-                <div key={n.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                  <h4 className="text-xs font-semibold text-slate-900">{n.title}</h4>
-                  <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{n.content}</p>
+                <div key={n.id} className="p-3 rounded-lg bg-slate-50 border border-slate-200 min-w-0">
+                  <h4 className="text-xs font-semibold text-slate-900 break-words">{n.title}</h4>
+                  <p className="text-[11px] text-slate-600 mt-1 line-clamp-2 break-words">{n.content}</p>
                   <span className="text-[10px] text-slate-400 mt-2 block">{n.publishDate}</span>
                 </div>
               ))}
@@ -290,32 +290,32 @@ export const DashboardPage: React.FC<{ onNavigate: (page: string) => void }> = (
         </div>
 
         {/* System Settings & GPS Status Info */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm min-w-0">
           <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center space-x-2">
-            <MapPin className="w-4 h-4 text-amber-600" />
-            <span>{t.systemGpsStatus}</span>
+            <MapPin className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="break-words">{t.systemGpsStatus}</span>
           </h3>
 
           <div className="space-y-3 text-xs">
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">{t.scheduledCheckIn}</span>
-              <span className="font-semibold text-slate-800">{formatNumber(settings.dailyCheckInTime, isBn)} AM</span>
+            <div className="flex items-center justify-between gap-3 py-2 border-b border-slate-100">
+              <span className="text-slate-500 min-w-0 break-words">{t.scheduledCheckIn}</span>
+              <span className="font-semibold text-slate-800 shrink-0 text-right">{formatNumber(settings.dailyCheckInTime, isBn)} AM</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">{t.scheduledCheckOut}</span>
-              <span className="font-semibold text-slate-800">{formatNumber(settings.dailyCheckOutTime, isBn)} AM</span>
+            <div className="flex items-center justify-between gap-3 py-2 border-b border-slate-100">
+              <span className="text-slate-500 min-w-0 break-words">{t.scheduledCheckOut}</span>
+              <span className="font-semibold text-slate-800 shrink-0 text-right">{formatNumber(settings.dailyCheckOutTime, isBn)} AM</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">{t.lateConsideration}</span>
-              <span className="font-semibold text-slate-800">{formatNumber(settings.lateGraceMinutes, isBn)} {t.minutesUnit}</span>
+            <div className="flex items-center justify-between gap-3 py-2 border-b border-slate-100">
+              <span className="text-slate-500 min-w-0 break-words">{t.lateConsideration}</span>
+              <span className="font-semibold text-slate-800 shrink-0 text-right">{formatNumber(settings.lateGraceMinutes, isBn)} {t.minutesUnit}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100">
-              <span className="text-slate-500">{t.allowedRadiusLabel}</span>
-              <span className="font-semibold text-slate-800">{formatNumber(settings.allowedRadiusMeters, isBn)} {t.metersUnit}</span>
+            <div className="flex items-center justify-between gap-3 py-2 border-b border-slate-100">
+              <span className="text-slate-500 min-w-0 break-words">{t.allowedRadiusLabel}</span>
+              <span className="font-semibold text-slate-800 shrink-0 text-right">{formatNumber(settings.allowedRadiusMeters, isBn)} {t.metersUnit}</span>
             </div>
-            <div className="flex justify-between py-2">
-              <span className="text-slate-500">{t.madrasaCoordinates}</span>
-              <span className="font-mono text-slate-700 text-[11px]">
+            <div className="flex items-center justify-between gap-3 py-2">
+              <span className="text-slate-500 min-w-0 break-words">{t.madrasaCoordinates}</span>
+              <span className="font-mono text-slate-700 text-[11px] shrink-0 text-right">
                 {settings.gpsLat.toFixed(4)}, {settings.gpsLng.toFixed(4)}
               </span>
             </div>

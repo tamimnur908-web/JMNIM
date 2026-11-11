@@ -946,19 +946,19 @@ export const TeacherAttendancePage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Live GPS Coordinates and Geofence */}
         <div className={`p-4 rounded-2xl border ${isWithinRadius ? 'bg-emerald-50/60 border-emerald-200' : 'bg-rose-50/60 border-rose-200'} md:col-span-2`}>
-          <div className="flex items-start justify-between">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
                 {isWithinRadius ? (
-                  <CheckCircle className="w-5 h-5 text-emerald-600" />
+                  <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
                 ) : (
-                  <XCircle className="w-5 h-5 text-rose-600" />
+                  <XCircle className="w-5 h-5 text-rose-600 shrink-0" />
                 )}
-                <h3 className="font-bold text-sm text-slate-900">
+                <h3 className="font-bold text-sm text-slate-900 break-words">
                   {isWithinRadius ? (isBn ? "মাদরাসা ক্যাম্পাসের ভেতরে অবস্থিত" : "Inside Madrasa Geofence") : (isBn ? "মাদরাসা ক্যাম্পাসের বাইরে অবস্থিত" : "Outside Madrasa Geofence")}
                 </h3>
               </div>
-              <p className="text-xs text-slate-600 mt-1">
+              <p className="text-xs text-slate-600 mt-1 break-words">
                 {distance !== null ? (
                   <>
                     {t.distanceFromMadrasa} <strong className="font-mono text-slate-900">{formatNumber(distance, isBn)} {t.metersUnit}</strong> ({t.allowedRadiusLabel} {formatNumber(settings.allowedRadiusMeters, isBn)} {t.metersUnit})
@@ -970,7 +970,7 @@ export const TeacherAttendancePage: React.FC = () => {
             </div>
 
             {accuracy !== null && (
-              <span className={`text-[11px] px-2 py-1 rounded-md font-medium border ${accuracy <= 50 ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-white text-amber-700 border-amber-200'}`}>
+              <span className={`self-start shrink-0 text-[11px] px-2 py-1 rounded-md font-medium border ${accuracy <= 50 ? 'bg-white text-emerald-700 border-emerald-200' : 'bg-white text-amber-700 border-amber-200'}`}>
                 {t.gpsAccuracy}: ±{formatNumber(accuracy, isBn)} {t.accuracyUnit}
               </span>
             )}
@@ -984,7 +984,7 @@ export const TeacherAttendancePage: React.FC = () => {
           )}
 
           {currentCoords && (
-            <div className="mt-3 text-[11px] text-slate-500 font-mono flex items-center space-x-4">
+            <div className="mt-3 text-[11px] text-slate-500 font-mono flex flex-wrap items-center gap-x-4 gap-y-1">
               <span>{t.latitudeLabel}: {currentCoords.lat.toFixed(6)}</span>
               <span>{t.longitudeLabel}: {currentCoords.lng.toFixed(6)}</span>
             </div>
@@ -993,12 +993,12 @@ export const TeacherAttendancePage: React.FC = () => {
 
         {/* Assigned Shift Timings for Today */}
         <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm text-xs space-y-2.5">
-          <div className="flex items-center justify-between border-b pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
             <h4 className="font-bold text-slate-800 flex items-center space-x-1.5">
-              <Clock className="w-4 h-4 text-blue-600" />
+              <Clock className="w-4 h-4 text-blue-600 shrink-0" />
               <span>{isBn ? "আজকের নির্ধারিত সেশনসমূহ" : "Assigned Sessions"}</span>
             </h4>
-            <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-bold">
+            <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-bold shrink-0">
               {applicableSchedules.length} {isBn ? "টি সেশন" : "Sessions"}
             </span>
           </div>
@@ -1035,14 +1035,14 @@ export const TeacherAttendancePage: React.FC = () => {
       </div>
 
       {/* Main Attendance Interaction Card */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b pb-3">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3">
           <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-            <FileCheck className="w-4 h-4 text-blue-600" />
+            <FileCheck className="w-4 h-4 text-blue-600 shrink-0" />
             <span>{isBn ? "উপস্থিতি চেক-ইন / চেক-আউট কন্ট্রোল" : "Attendance Entry Controls"}</span>
           </h3>
           {isAdminOrSuperAdmin && (
-            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+            <span className="self-start sm:self-center shrink-0 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
               {isBn ? "প্রশাসনিক মোড (Admin Manual Mode)" : "Admin Manual Mode"}
             </span>
           )}
@@ -1278,12 +1278,12 @@ export const TeacherAttendancePage: React.FC = () => {
 
       {/* TODAY'S RAW ATTENDANCE EVENTS LOG */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2">
-            <Clock className="w-4 h-4 text-blue-600" />
-            <span>{isBn ? "আজকের সকল ইভেন্ট লগ" : "Today's Attendance Events"} ({formatNumber(getTodayDateString(), isBn)})</span>
+        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center space-x-2 min-w-0">
+            <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="break-words">{isBn ? "আজকের সকল ইভেন্ট লগ" : "Today's Attendance Events"} ({formatNumber(getTodayDateString(), isBn)})</span>
           </h3>
-          <span className="text-xs font-semibold text-slate-500">
+          <span className="text-xs font-semibold text-slate-500 shrink-0">
             {isBn ? `মোট ইভেন্ট: ${todayTargetEvents.length}` : `Events: ${todayTargetEvents.length}`}
           </span>
         </div>
@@ -1370,24 +1370,24 @@ export const TeacherAttendancePage: React.FC = () => {
       {/* MODAL 1: TEACHER LEAVE APPLICATION MODAL (Requirement 6)                  */}
       {/* ========================================================================= */}
       {showApplyLeaveModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-auto animate-scaleUp">
-            <div className="p-5 bg-gradient-to-r from-amber-600 to-orange-700 text-white flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <CalendarDays className="w-5 h-5 text-amber-200" />
-                <h3 className="font-bold text-base">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-600 to-orange-700 text-white flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <CalendarDays className="w-5 h-5 text-amber-200 shrink-0" />
+                <h3 className="font-bold text-sm sm:text-base break-words">
                   {isBn ? "ছুটির আবেদন ফরম (Leave Application)" : "Apply for Leave"}
                 </h3>
               </div>
               <button 
                 onClick={() => setShowApplyLeaveModal(false)}
-                className="text-white/80 hover:text-white text-lg font-bold"
+                className="text-white/80 hover:text-white text-lg font-bold shrink-0 p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmitLeaveApplication} className="p-5 sm:p-6 space-y-4 text-xs">
+            <form onSubmit={handleSubmitLeaveApplication} className="p-4 sm:p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
                   {isBn ? "ছুটির ধরন (Leave Type) *" : "Leave Type *"}
@@ -1406,7 +1406,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     {isBn ? "আরম্ভের তারিখ (Start Date) *" : "Start Date *"}
@@ -1437,7 +1437,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   {isBn ? "ছুটির পরিধি (Leave Scope) *" : "Scope *"}
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {[
                     { id: 'full_day', labelBn: 'সম্পূর্ণ দিন', labelEn: 'Full Day' },
                     { id: 'partial_day', labelBn: 'অর্ধ দিন', labelEn: 'Partial Day' },
@@ -1531,24 +1531,24 @@ export const TeacherAttendancePage: React.FC = () => {
       {/* MODAL 2: ADMIN DIRECT LEAVE GRANT MODAL (Requirement 7)                   */}
       {/* ========================================================================= */}
       {showGrantLeaveModal && isAdminOrSuperAdmin && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden my-auto animate-scaleUp">
-            <div className="p-5 bg-gradient-to-r from-purple-700 to-indigo-800 text-white flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <PlusCircle className="w-5 h-5 text-purple-200" />
-                <h3 className="font-bold text-base">
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-purple-700 to-indigo-800 text-white flex items-center justify-between gap-3">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <PlusCircle className="w-5 h-5 text-purple-200 shrink-0" />
+                <h3 className="font-bold text-sm sm:text-base break-words">
                   {isBn ? "শিক্ষককে সরাসরি ছুটি প্রদান (Grant Leave to Teacher)" : "Grant Leave Directly"}
                 </h3>
               </div>
               <button 
                 onClick={() => setShowGrantLeaveModal(false)}
-                className="text-white/80 hover:text-white text-lg font-bold"
+                className="text-white/80 hover:text-white text-lg font-bold shrink-0 p-1"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleDirectGrantLeave} className="p-5 sm:p-6 space-y-4 text-xs">
+            <form onSubmit={handleDirectGrantLeave} className="p-4 sm:p-6 space-y-4 text-xs max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
                   {isBn ? "শিক্ষক নির্বাচন করুন (Select Teacher) *" : "Select Teacher *"}
@@ -1586,7 +1586,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     {isBn ? "আরম্ভের তারিখ *" : "Start Date *"}
@@ -1857,7 +1857,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     {isBn ? "সেশন শুরু (Start Time) *" : "Start Time *"}
@@ -1884,7 +1884,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">
                     {isBn ? "বিলম্ব বিবেচনা গ্রেস পিরিয়ড (মিনিট)" : "Late Grace Period (Mins)"}
@@ -1953,7 +1953,7 @@ export const TeacherAttendancePage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-800">
                   {isBn ? "কাদের ওপর এই শিডিউল প্রযোজ্য হবে? (Schedule Assignment) *" : "Apply Schedule To: *"}
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setScheduleForm({ ...scheduleForm, targetType: 'all' })}
@@ -2031,14 +2031,14 @@ export const TeacherAttendancePage: React.FC = () => {
                   <h4 className="font-bold text-slate-800 text-xs">{isBn ? "বিদ্যমান সক্রিয় শিডিউলসমূহ" : "Existing Schedules"}</h4>
                   <div className="space-y-2">
                     {schedules.map(sc => (
-                      <div key={sc.id} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-between">
-                        <div>
-                          <div className="font-bold text-slate-900 flex items-center space-x-2">
-                            <span>{sc.name}</span>
-                            <span className="text-[10px] bg-slate-200 px-1.5 py-0.2 rounded font-mono">
+                      <div key={sc.id} className="p-2.5 bg-slate-50 border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 flex flex-wrap items-center gap-1.5">
+                            <span className="break-words">{sc.name}</span>
+                            <span className="text-[10px] bg-slate-200 px-1.5 py-0.2 rounded font-mono shrink-0">
                               {sc.startTime} - {sc.endTime}
                             </span>
-                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded shrink-0 ${
                               sc.targetType === 'all' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800'
                             }`}>
                               {sc.targetType === 'all' ? (isBn ? 'সকল শিক্ষক' : 'All') : `${sc.assignedTeacherIds?.length || 0} শিক্ষক`}

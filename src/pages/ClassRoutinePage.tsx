@@ -283,15 +283,15 @@ export const ClassRoutinePage: React.FC = () => {
 
       {/* Add Period Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'নতুন পিরিয়ড সংযোজন' : 'Add New Period'}</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400">✕</button>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 shrink-0 p-1">✕</button>
             </div>
 
             <form onSubmit={handleAddPeriod} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'পিরিয়ড ক্রম (নং)' : 'Period No'}</label>
                   <input
@@ -315,7 +315,7 @@ export const ClassRoutinePage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'শুরুর সময়' : 'Start Time'}</label>
                   <input

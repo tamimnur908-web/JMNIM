@@ -163,7 +163,7 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-50 flex flex-col fixed inset-0">
+    <div className="h-[100dvh] w-full overflow-hidden bg-slate-50 flex flex-col print:h-auto print:overflow-visible">
       <Header 
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         onNavigate={(p) => setCurrentPage(p)}
@@ -172,15 +172,15 @@ const MainLayout: React.FC = () => {
         currentPage={currentPage}
         onSelectPage={(p) => setCurrentPage(p)}
       />
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 flex min-h-0 overflow-hidden relative print:overflow-visible">
         <Sidebar 
           currentPage={currentPage}
           onSelectPage={(p) => setCurrentPage(p)}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 h-full overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50">
-          <div className="max-w-7xl mx-auto pb-16">
+        <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden p-3 sm:p-6 lg:p-8 bg-slate-50 print:overflow-visible print:p-0">
+          <div className="max-w-7xl mx-auto pb-16 min-w-0">
             {renderContent()}
           </div>
         </main>

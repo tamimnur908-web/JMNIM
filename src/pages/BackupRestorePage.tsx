@@ -528,7 +528,7 @@ export const BackupRestorePage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   {isBn ? 'আমদানির ধরন নির্বাচন করুন:' : 'Select Import Type:'}
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     { id: 'students', label: isBn ? '১. শিক্ষার্থী তালিকা ও ব্যক্তিগত তথ্য' : 'Students List' },
                     { id: 'fees', label: isBn ? '২. পূর্বের ফি ও বকেয়া হিসাব' : 'Fee Records & Balances' },
@@ -575,7 +575,7 @@ export const BackupRestorePage: React.FC = () => {
           {/* STEP 2: Column Mapping */}
           {wizardStep === 2 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
                     {isBn ? 'কলাম ম্যাপিং (Column Mapping)' : 'Column Mapping'}
@@ -589,13 +589,13 @@ export const BackupRestorePage: React.FC = () => {
 
                 <button
                   onClick={() => setWizardStep(1)}
-                  className="px-3 py-1.5 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  className="px-3 py-1.5 border rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 shrink-0 self-start sm:self-center"
                 >
                   ← {isBn ? 'ফাইল পরিবর্তন' : 'Change File'}
                 </button>
               </div>
 
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <div className="border border-slate-200 rounded-xl overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b font-bold text-slate-700">
@@ -656,7 +656,7 @@ export const BackupRestorePage: React.FC = () => {
           {/* STEP 3: Preview & Validation (Detect Duplicates & Errors) */}
           {wizardStep === 3 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
                     {isBn ? 'ডাটা প্রিভিউ, ডুপ্লিকেট শনাক্তকরণ ও ভ্যালিডেশন' : 'Preview, Duplicate Detection & Validation'}
@@ -668,14 +668,14 @@ export const BackupRestorePage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 shrink-0">
                   <span className="text-xs font-semibold text-slate-600">
                     {isBn ? `মোট সারি: ${validatedRows.length} | গ্রহণযোগ্য: ${validatedRows.filter(r => r.isValid && !r.excluded).length}` : `Total: ${validatedRows.length}`}
                   </span>
                 </div>
               </div>
 
-              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
+              <div className="border border-slate-200 rounded-xl overflow-auto max-h-96">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="sticky top-0 bg-slate-100 border-b font-bold text-slate-700">
                     <tr>
@@ -731,7 +731,7 @@ export const BackupRestorePage: React.FC = () => {
                 </table>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                 <button
                   onClick={() => setWizardStep(2)}
                   className="px-4 py-2 border rounded-xl text-xs font-semibold"
@@ -827,9 +827,9 @@ export const BackupRestorePage: React.FC = () => {
 
       {/* TAB 3: AUDIT TRAIL LOGS (Requirement 8) */}
       {activeTab === 'audit' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-          <div className="border-b pb-3 flex items-center justify-between">
-            <div>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
+          <div className="border-b pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
                 <History className="w-5 h-5 text-blue-600" />
                 <span>{isBn ? 'অপরিবর্তনযোগ্য সিস্টেম অডিট ট্রেইল (Audit Trail Logs)' : 'Immutable Audit Trail'}</span>

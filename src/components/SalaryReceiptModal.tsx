@@ -229,7 +229,7 @@ export const SalaryReceiptModal: React.FC<SalaryReceiptModalProps> = ({
                   ? 'আমি স্বীকার করছি যে, উপরে উল্লেখিত মাসের জন্য প্রদেয় বেতনের সম্পূর্ণ টাকা আমি বুঝে পেয়েছি। প্রদত্ত বেতন ও পরিশোধের বিবরণ আমার জানা ও সম্মতিক্রমে সঠিক।'
                   : 'I hereby acknowledge that I have received the full salary amount stated above for the specified month. I confirm that the payment details and amount are correct to the best of my knowledge.')}"
               </p>
-              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 pt-1">
                 <span>
                   <b>{isBn ? 'স্বীকৃতির সময়:' : 'Acknowledgment Time:'}</b> {formatTimestamp(payment.acknowledgedAt)}
                 </span>
@@ -241,7 +241,7 @@ export const SalaryReceiptModal: React.FC<SalaryReceiptModalProps> = ({
           )}
 
           {/* Signature Footer */}
-          <div className="pt-6 sm:pt-8 grid grid-cols-2 gap-4">
+          <div className="pt-6 sm:pt-8 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-4">
             
             {/* Teacher Signature Box */}
             <div className="flex flex-col items-center justify-end text-center">

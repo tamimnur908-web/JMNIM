@@ -316,23 +316,23 @@ export const AdmissionPage: React.FC<{ onNavigateToStudents?: () => void }> = ({
 
       {/* Success Receipt Modal/View */}
       {successReceipt && (
-        <div className="bg-white rounded-2xl border-2 border-emerald-500 p-6 shadow-xl space-y-5 animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-emerald-100 pb-4 no-print">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border-2 border-emerald-500 p-4 sm:p-6 shadow-xl space-y-5 animate-fadeIn">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-100 pb-4 no-print">
+            <div className="flex items-start sm:items-center space-x-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                 <CheckCircle className="w-6 h-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-base font-bold text-emerald-900">
                   {isBn ? 'ভর্তি সফলভাবে সম্পন্ন হয়েছে!' : 'Admission Successfully Completed!'}
                 </h3>
-                <p className="text-xs text-emerald-700">
+                <p className="text-xs text-emerald-700 break-words">
                   {isBn ? 'শিক্ষার্থী প্রোফাইল ও মানি রসিদ সফলভাবে সিস্টেমে যুক্ত হয়েছে।' : 'Student profile and money receipt have been added.'}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={printReceipt}
@@ -536,7 +536,7 @@ export const AdmissionPage: React.FC<{ onNavigateToStudents?: () => void }> = ({
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 {isBn ? 'আবাসিক ধরন (Residential Category) *' : 'Residential Category *'}
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {[
                   { id: 'residential', label: isBn ? 'আবাসিক' : 'Residential', desc: isBn ? 'মাদরাসায় সার্বক্ষণিক অবস্থান ও খাদ্য' : 'Full-time boarding' },
                   { id: 'non_residential', label: isBn ? 'অনাবাসিক' : 'Non-Residential', desc: isBn ? 'ক্লাস শেষে বাসায় প্রস্থান' : 'Day scholar' },
@@ -696,8 +696,8 @@ export const AdmissionPage: React.FC<{ onNavigateToStudents?: () => void }> = ({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Monthly Fee Box with Override option */}
             <div className="sm:col-span-2 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="min-w-0">
                   <span className="text-xs font-bold text-slate-800">
                     {isBn ? 'প্রযোজ্য নিয়মিত মাসিক বেতন' : 'Applicable Regular Monthly Fee'}
                   </span>
@@ -706,7 +706,7 @@ export const AdmissionPage: React.FC<{ onNavigateToStudents?: () => void }> = ({
                   </p>
                 </div>
 
-                <label className="flex items-center space-x-2 text-xs font-semibold text-blue-700 cursor-pointer">
+                <label className="flex items-center space-x-2 text-xs font-semibold text-blue-700 cursor-pointer shrink-0">
                   <input
                     type="checkbox"
                     checked={isFeeOverridden}
@@ -721,8 +721,8 @@ export const AdmissionPage: React.FC<{ onNavigateToStudents?: () => void }> = ({
               </div>
 
               {isFeeOverridden ? (
-                <div className="flex items-center space-x-3 bg-white p-3 rounded-lg border border-amber-300">
-                  <div className="flex-1">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-white p-3 rounded-lg border border-amber-300">
+                  <div className="flex-1 min-w-0">
                     <label className="block text-[11px] font-semibold text-amber-900 mb-0.5">
                       {isBn ? 'ওভাররাইডকৃত বিশেষ মাসিক বেতন (৳)' : 'Overridden Monthly Fee (BDT)'}
                     </label>
@@ -740,7 +740,7 @@ export const AdmissionPage: React.FC<{ onNavigateToStudents?: () => void }> = ({
                   </div>
                 </div>
               ) : (
-                <div className="text-sm font-bold text-emerald-800 bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 flex items-center justify-between">
+                <div className="text-sm font-bold text-emerald-800 bg-emerald-50/70 p-3 rounded-lg border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
                   <span>{isBn ? 'ডিফল্ট হার অনুযায়ী নির্ধারিত:' : 'Calculated by Default Rules:'}</span>
                   <span className="text-base">{formatBDT(calculatedDefaultFee, isBn)}</span>
                 </div>

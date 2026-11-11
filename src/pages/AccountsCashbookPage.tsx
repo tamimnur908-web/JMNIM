@@ -370,18 +370,18 @@ export const AccountsCashbookPage: React.FC = () => {
 
       {/* Add Transaction Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2">
-                <BookOpen className="w-4 h-4 text-blue-600" />
-                <span>{txType === 'income' ? (isBn ? 'নতুন জমা এন্ট্রি (Income Voucher)' : 'Record Income') : (isBn ? 'নতুন খরচ এন্ট্রি (Expense Voucher)' : 'Record Expense')}</span>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-900 flex items-center space-x-2 min-w-0">
+                <BookOpen className="w-4 h-4 text-blue-600 shrink-0" />
+                <span className="break-words">{txType === 'income' ? (isBn ? 'নতুন জমা এন্ট্রি (Income Voucher)' : 'Record Income') : (isBn ? 'নতুন খরচ এন্ট্রি (Expense Voucher)' : 'Record Expense')}</span>
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 shrink-0 p-1">✕</button>
             </div>
 
             <form onSubmit={handleCreateTransaction} className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'খাত / ক্যাটাগরি' : 'Category'}</label>
                   <select
@@ -406,7 +406,7 @@ export const AccountsCashbookPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'তারিখ' : 'Date'}</label>
                   <input
@@ -480,8 +480,8 @@ export const AccountsCashbookPage: React.FC = () => {
 
       {/* Printable Voucher Modal */}
       {selectedVoucher && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 print:static print:bg-transparent print:p-0">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:shadow-none p-5 sm:p-6 print:p-0 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3 no-print">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'ক্যাশ ভাউচার' : 'Cash Voucher'}</h3>
               <div className="flex space-x-2">
@@ -543,7 +543,7 @@ export const AccountsCashbookPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-8 flex items-end justify-between text-slate-500 text-[10px]">
+              <div className="pt-8 flex flex-wrap items-end justify-between gap-4 text-slate-500 text-[10px]">
                 <div className="border-t border-slate-400 w-28 text-center pt-1">
                   {isBn ? 'আদায়কারী / প্রস্তুতকারী' : 'Prepared By'}
                 </div>

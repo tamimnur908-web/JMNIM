@@ -275,9 +275,9 @@ export const NoticeBoardPage: React.FC = () => {
 
       {/* Add Notice Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'নতুন নোটিশ জারি করুন' : 'Publish Notice'}</h3>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400">✕</button>
             </div>
@@ -295,7 +295,7 @@ export const NoticeBoardPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">{isBn ? 'প্রাপক / লক্ষ্য' : 'Target Audience'}</label>
                   <select
@@ -400,7 +400,7 @@ export const NoticeBoardPage: React.FC = () => {
               </div>
 
               {/* Bottom Signatures */}
-              <div className="pt-8 flex items-end justify-between border-t border-slate-100">
+              <div className="pt-8 flex flex-wrap items-end justify-between gap-4 border-t border-slate-100">
                 <div className="text-left text-[10px] text-slate-400">
                   <p>জারিকারী: {viewNotice.createdBy}</p>
                   <p>প্রাপক: {viewNotice.targetRole === 'all' ? 'সকলের জন্য' : viewNotice.targetRole}</p>

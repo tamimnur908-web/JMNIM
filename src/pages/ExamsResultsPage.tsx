@@ -420,9 +420,9 @@ export const ExamsResultsPage: React.FC = () => {
 
       {/* New Exam Modal */}
       {showNewExamModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between gap-2 border-b pb-3">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'নতুন পরীক্ষা তৈরি' : 'Create Examination'}</h3>
               <button onClick={() => setShowNewExamModal(false)} className="text-slate-400">✕</button>
             </div>
@@ -473,8 +473,8 @@ export const ExamsResultsPage: React.FC = () => {
 
       {/* Printable Result Card Modal */}
       {resultCardStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 print:static print:bg-transparent print:p-0">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto print:max-h-none print:overflow-visible print:shadow-none p-5 sm:p-6 print:p-0 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3 no-print">
               <h3 className="text-base font-bold text-slate-900">{isBn ? 'শিক্ষার্থীর ফলাফল পত্র' : 'Marksheet Card'}</h3>
               <div className="flex space-x-2">
@@ -542,7 +542,7 @@ export const ExamsResultsPage: React.FC = () => {
                 </tbody>
               </table>
 
-              <div className="pt-8 flex justify-between text-slate-500 text-[10px]">
+              <div className="pt-8 flex flex-wrap justify-between gap-4 text-slate-500 text-[10px]">
                 <div className="border-t border-slate-400 w-28 text-center pt-1">
                   {isBn ? 'শ্রেণি শিক্ষকের স্বাক্ষর' : 'Class Teacher'}
                 </div>
