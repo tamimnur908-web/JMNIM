@@ -102,7 +102,7 @@ export const runAttendanceSentinel = async (settings: InstitutionSettings): Prom
                 title: `মিসড চেক-আউট নোটিশ: ${currentOpenCheckIn.teacherName}`,
                 message: `${currentOpenCheckIn.teacherName} (${currentOpenCheckIn.teacherId}) '${scheduleName}'-এ চেক-ইন করলেও নির্ধারিত প্রস্থান সময় ${scheduledCheckoutTime}-এ চেক-আউট সম্পন্ন করেননি।`,
                 type: 'missed_checkout',
-                linkPage: 'attendance',
+                linkPage: 'teacherAttendance',
                 targetRole: ['admin', 'principal'],
                 read: false,
                 createdAt: new Date().toISOString()
@@ -114,7 +114,7 @@ export const runAttendanceSentinel = async (settings: InstitutionSettings): Prom
                 title: 'চেক-আউট রিমাইন্ডার নোটিশ',
                 message: `সম্মানিত ${currentOpenCheckIn.teacherName}, আপনার আজকের '${scheduleName}' নির্ধারিত প্রস্থান সময় (${scheduledCheckoutTime}) অতিক্রম করেছে। অনুগ্রহ করে দ্রুত চেক-আউট সম্পন্ন করুন।`,
                 type: 'missed_checkout',
-                linkPage: 'attendance',
+                linkPage: 'teacherAttendance',
                 targetUid: currentOpenCheckIn.teacherUid,
                 read: false,
                 createdAt: new Date().toISOString()
@@ -169,7 +169,7 @@ export const runAttendanceSentinel = async (settings: InstitutionSettings): Prom
                 title: `অটো চেক-আউট কার্যকর: ${currentOpenCheckIn.teacherName}`,
                 message: `${currentOpenCheckIn.teacherName} (${currentOpenCheckIn.teacherId})-এর '${scheduleName}' খোলা সেশনটি অতিরিক্ত ${waitingPeriod} মিনিট অপেক্ষার পর স্বয়ংক্রিয়ভাবে Auto Check-Out করা হয়েছে।`,
                 type: 'auto_checkout',
-                linkPage: 'attendance',
+                linkPage: 'teacherAttendance',
                 targetRole: ['admin', 'principal'],
                 read: false,
                 createdAt: new Date().toISOString()
@@ -181,7 +181,7 @@ export const runAttendanceSentinel = async (settings: InstitutionSettings): Prom
                 title: 'অটো চেক-আউট সম্পন্ন হয়েছে',
                 message: `সম্মানিত ${currentOpenCheckIn.teacherName}, আপনার আজকের '${scheduleName}' সেশনটি নির্ধারিত সময়সীমা উত্তীর্ণ হওয়ায় সিস্টেম কর্তৃক স্বয়ংক্রিয়ভাবে (${cutoffTimeString}) অটো চেক-আউট সম্পন্ন করা হয়েছে।`,
                 type: 'auto_checkout',
-                linkPage: 'attendance',
+                linkPage: 'teacherAttendance',
                 targetUid: currentOpenCheckIn.teacherUid,
                 read: false,
                 createdAt: new Date().toISOString()

@@ -64,25 +64,58 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const resolveNotificationTargetPage = (notif: NotificationItem): string | undefined => {
+    if (notif.linkPage === 'attendance') {
+      return 'teacherAttendance';
+    }
+    if (notif.linkPage) {
+      return notif.linkPage;
+    }
+    switch (notif.type as string) {
+      case 'missed_checkout':
+      case 'auto_checkout':
+      case 'leave_request':
+      case 'leave_approved':
+      case 'leave_rejected':
+        return 'teacherAttendance';
+      case 'salary_payment':
+      case 'salary_reminder':
+      case 'salary_acknowledged':
+        return 'teacherSalary';
+      case 'approval_request':
+      case 'user_registration':
+      case 'account_approval':
+        return 'userApprovals';
+      case 'student_edit_request':
+      case 'student_delete_request':
+        return 'students';
+      default:
+        return undefined;
+    }
+  };
+
   const handleMarkAsRead = async (notif: NotificationItem) => {
-    try {
-      if (!notif.read) {
+    const targetPage = resolveNotificationTargetPage(notif);
+
+    if (!notif.read) {
+      try {
         await updateDoc(doc(db, 'notifications', notif.id), { read: true });
         setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+      } catch (err) {
+        console.warn("Could not mark notif as read:", err);
       }
-      if (notif.linkPage && onNavigate) {
-        setNotifOpen(false);
-        if (notif.applicantUid) {
-          sessionStorage.setItem('open_approval_uid', notif.applicantUid);
-        }
-        if (notif.salaryPaymentId) {
-          sessionStorage.setItem('open_salary_payment_id', notif.salaryPaymentId);
-          window.dispatchEvent(new CustomEvent('open_salary_payment', { detail: { paymentId: notif.salaryPaymentId } }));
-        }
-        onNavigate(notif.linkPage);
+    }
+
+    if (targetPage && onNavigate) {
+      setNotifOpen(false);
+      if (notif.applicantUid) {
+        sessionStorage.setItem('open_approval_uid', notif.applicantUid);
       }
-    } catch (err) {
-      console.warn("Could not mark notif as read:", err);
+      if (notif.salaryPaymentId) {
+        sessionStorage.setItem('open_salary_payment_id', notif.salaryPaymentId);
+        window.dispatchEvent(new CustomEvent('open_salary_payment', { detail: { paymentId: notif.salaryPaymentId } }));
+      }
+      onNavigate(targetPage);
     }
   };
 
