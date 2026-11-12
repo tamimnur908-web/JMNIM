@@ -574,6 +574,7 @@ export const UserApprovalsPage: React.FC = () => {
           title: 'নিবন্ধন আবেদন সংক্রান্ত নোটিশ',
           message: `আপনার অ্যাকাউন্ট আবেদনটি কর্তৃপক্ষ কর্তৃক গৃহীত হয়নি। কারণ: ${rejectionReason.trim() || 'কর্তৃপক্ষের সিদ্ধান্ত'}`,
           type: 'approval_result',
+          linkPage: 'dashboard',
           targetUid: uid,
           read: false,
           createdAt: now

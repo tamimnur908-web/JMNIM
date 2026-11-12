@@ -320,6 +320,7 @@ export async function provisionApprovedUser({
       title: 'আপনার অ্যাকাউন্ট অনুমোদিত ও সক্রিয় হয়েছে!',
       message: `মুবারকবাদ! মাদরাসা কর্তৃপক্ষ আপনার নিবন্ধন অনুমোদন করেছেন এবং সংশ্লিষ্ট সকল মডিউলে সক্রিয় করা হয়েছে। নির্ধারিত রোল: ${roleBn} (${assignedRole.toUpperCase()})।`,
       type: 'approval_result',
+      linkPage: 'dashboard',
       targetUid: uid,
       read: false,
       createdAt: now

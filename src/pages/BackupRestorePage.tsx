@@ -378,7 +378,8 @@ export const BackupRestorePage: React.FC = () => {
       await createNotification({
         title: isBn ? 'এক্সেল ডাটা আমদানি সম্পন্ন' : 'Excel Import Completed',
         message: `${importCategory} এর ${importedCount} টি রেকর্ড সফলভাবে সিস্টেমে যুক্ত হয়েছে।`,
-        type: 'import_summary'
+        type: 'import_summary',
+        linkPage: 'backupRestore'
       });
 
       setWizardStep(4);

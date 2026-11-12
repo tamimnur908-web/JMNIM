@@ -65,12 +65,24 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const resolveNotificationTargetPage = (notif: NotificationItem): string | undefined => {
-    if (notif.linkPage === 'attendance') {
-      return 'teacherAttendance';
+    const rawLink = notif.linkPage?.trim();
+    if (rawLink) {
+      const legacyMap: Record<string, string> = {
+        attendance: 'teacherAttendance',
+        payroll: 'teacherSalary',
+        fees: 'feeManagement',
+        backup: 'backupRestore',
+      };
+      return legacyMap[rawLink] || rawLink;
     }
-    if (notif.linkPage) {
-      return notif.linkPage;
+
+    if (notif.salaryPaymentId) {
+      return 'teacherSalary';
     }
+    if (notif.applicantUid) {
+      return 'userApprovals';
+    }
+
     switch (notif.type as string) {
       case 'missed_checkout':
       case 'auto_checkout':
@@ -89,8 +101,38 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
       case 'student_edit_request':
       case 'student_delete_request':
         return 'students';
-      default:
-        return undefined;
+      case 'import_summary':
+        return 'backupRestore';
+      case 'approval_result': {
+        const text = `${notif.title || ''} ${notif.message || ''}`.toLowerCase();
+        if (text.includes('ছুটি') || text.includes('leave')) {
+          return 'teacherAttendance';
+        }
+        return 'dashboard';
+      }
+      case 'system':
+      default: {
+        const text = `${notif.title || ''} ${notif.message || ''}`.toLowerCase();
+        if (text.includes('চেক-আউট') || text.includes('চেক-ইন') || text.includes('check-out') || text.includes('check-in') || text.includes('ছুটি') || text.includes('leave')) {
+          return 'teacherAttendance';
+        }
+        if (text.includes('বেতন') || text.includes('salary') || text.includes('পে-রোল')) {
+          return 'teacherSalary';
+        }
+        if (text.includes('শিক্ষার্থী') || text.includes('student')) {
+          return 'students';
+        }
+        if (text.includes('নিবন্ধন') || text.includes('অনুমোদন') || text.includes('registration') || text.includes('approval')) {
+          return 'userApprovals';
+        }
+        if (text.includes('এক্সেল') || text.includes('import') || text.includes('ব্যাকআপ') || text.includes('backup')) {
+          return 'backupRestore';
+        }
+        if (text.includes('নোটিশ') || text.includes('notice')) {
+          return 'notices';
+        }
+        return 'dashboard';
+      }
     }
   };
 
